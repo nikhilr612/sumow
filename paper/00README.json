@@ -1,0 +1,29 @@
+{
+   "sources" : [
+      {
+         "usage" : "toplevel",
+         "filename" : "iclr2025_conference.tex"
+      },
+      {
+         "usage" : "ignore",
+         "filename" : "figs/iclr2025_conference.bst"
+      },
+      {
+         "usage" : "ignore",
+         "filename" : "figs/iclr2025_conference.sty"
+      },
+      {
+         "usage" : "ignore",
+         "filename" : "iclr2025_conference.bib"
+      },
+      {
+         "usage" : "ignore",
+         "filename" : "iclr2025_conference.bst"
+      }
+   ],
+   "version" : 2,
+   "texlive_version" : 2023,
+   "process" : {
+      "compiler" : "pdflatex"
+   }
+}

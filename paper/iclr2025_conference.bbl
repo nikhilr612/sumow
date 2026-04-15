@@ -1,0 +1,197 @@
+\begin{thebibliography}{33}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Ashkboos et~al.(2024)Ashkboos, Mohtashami, Croci, Li, Jaggi, Alistarh, Hoefler, and Hensman]{ashkboos2024quarot}
+Saleh Ashkboos, Amirkeivan Mohtashami, Maximilian~L Croci, Bo~Li, Martin Jaggi, Dan Alistarh, Torsten Hoefler, and James Hensman.
+\newblock Quarot: Outlier-free 4-bit inference in rotated llms.
+\newblock \emph{arXiv preprint arXiv:2404.00456}, 2024.
+
+\bibitem[Bisk et~al.(2020)Bisk, Zellers, Gao, Choi, et~al.]{bisk2020piqa}
+Yonatan Bisk, Rowan Zellers, Jianfeng Gao, Yejin Choi, et~al.
+\newblock Piqa: Reasoning about physical commonsense in natural language.
+\newblock In \emph{Proceedings of the AAAI conference on artificial intelligence}, volume~34, pp.\  7432--7439, 2020.
+
+\bibitem[Bondarenko et~al.(2021)Bondarenko, Nagel, and Blankevoort]{bondarenko-etal-2021-understanding}
+Yelysei Bondarenko, Markus Nagel, and Tijmen Blankevoort.
+\newblock Understanding and overcoming the challenges of efficient transformer quantization.
+\newblock In Marie-Francine Moens, Xuanjing Huang, Lucia Specia, and Scott Wen-tau Yih (eds.), \emph{Proceedings of the 2021 Conference on Empirical Methods in Natural Language Processing}, pp.\  7947--7969, Online and Punta Cana, Dominican Republic, November 2021. Association for Computational Linguistics.
+\newblock \doi{10.18653/v1/2021.emnlp-main.627}.
+\newblock URL \url{https://aclanthology.org/2021.emnlp-main.627}.
+
+\bibitem[Chee et~al.(2023)Chee, Cai, Kuleshov, and De~Sa]{QuIP}
+Jerry Chee, Yaohui Cai, Volodymyr Kuleshov, and Christopher~M De~Sa.
+\newblock Quip: 2-bit quantization of large language models with guarantees.
+\newblock In A.~Oh, T.~Naumann, A.~Globerson, K.~Saenko, M.~Hardt, and S.~Levine (eds.), \emph{Advances in Neural Information Processing Systems}, volume~36, pp.\  4396--4429. Curran Associates, Inc., 2023.
+\newblock URL \url{https://proceedings.neurips.cc/paper_files/paper/2023/file/0df38cd13520747e1e64e5b123a78ef8-Paper-Conference.pdf}.
+
+\bibitem[Clark et~al.(2018)Clark, Cowhey, Etzioni, Khot, Sabharwal, Schoenick, and Tafjord]{clark2018thinksolvedquestionanswering}
+Peter Clark, Isaac Cowhey, Oren Etzioni, Tushar Khot, Ashish Sabharwal, Carissa Schoenick, and Oyvind Tafjord.
+\newblock Think you have solved question answering? try arc, the ai2 reasoning challenge, 2018.
+\newblock URL \url{https://arxiv.org/abs/1803.05457}.
+
+\bibitem[Dettmers \& Zettlemoyer(2023)Dettmers and Zettlemoyer]{dettmers2023case}
+Tim Dettmers and Luke Zettlemoyer.
+\newblock The case for 4-bit precision: k-bit inference scaling laws.
+\newblock In \emph{International Conference on Machine Learning}, pp.\  7750--7774. PMLR, 2023.
+
+\bibitem[Dettmers et~al.(2022)Dettmers, Lewis, Belkada, and Zettlemoyer]{NEURIPS2022_c3ba4962}
+Tim Dettmers, Mike Lewis, Younes Belkada, and Luke Zettlemoyer.
+\newblock Gpt3.int8(): 8-bit matrix multiplication for transformers at scale.
+\newblock In S.~Koyejo, S.~Mohamed, A.~Agarwal, D.~Belgrave, K.~Cho, and A.~Oh (eds.), \emph{Advances in Neural Information Processing Systems}, volume~35, pp.\  30318--30332. Curran Associates, Inc., 2022.
+\newblock URL \url{https://proceedings.neurips.cc/paper_files/paper/2022/file/c3ba4962c05c49636d4c6206a97e9c8a-Paper-Conference.pdf}.
+
+\bibitem[Dettmers et~al.(2023)Dettmers, Pagnoni, Holtzman, and Zettlemoyer]{dettmers2023qlora}
+Tim Dettmers, Artidoro Pagnoni, Ari Holtzman, and Luke Zettlemoyer.
+\newblock {QL}o{RA}: Efficient finetuning of quantized {LLM}s.
+\newblock In \emph{Thirty-seventh Conference on Neural Information Processing Systems}, 2023.
+\newblock URL \url{https://openreview.net/forum?id=OUIFPHEgJU}.
+
+\bibitem[Dettmers et~al.(2024)Dettmers, Svirschevski, Egiazarian, Kuznedelev, Frantar, Ashkboos, Borzunov, Hoefler, and Alistarh]{dettmers2024spqr}
+Tim Dettmers, Ruslan~A. Svirschevski, Vage Egiazarian, Denis Kuznedelev, Elias Frantar, Saleh Ashkboos, Alexander Borzunov, Torsten Hoefler, and Dan Alistarh.
+\newblock Sp{QR}: A sparse-quantized representation for near-lossless {LLM} weight compression.
+\newblock In \emph{The Twelfth International Conference on Learning Representations}, 2024.
+\newblock URL \url{https://openreview.net/forum?id=Q1u25ahSuy}.
+
+\bibitem[Frantar et~al.(2022)Frantar, Ashkboos, Hoefler, and Alistarh]{frantar-gptq}
+Elias Frantar, Saleh Ashkboos, Torsten Hoefler, and Dan Alistarh.
+\newblock {GPTQ}: Accurate post-training compression for generative pretrained transformers.
+\newblock \emph{arXiv preprint arXiv:2210.17323}, 2022.
+
+\bibitem[Gao et~al.(2024)Gao, Tow, Abbasi, Biderman, Black, DiPofi, Foster, Golding, Hsu, Le~Noac'h, Li, McDonell, Muennighoff, Ociepa, Phang, Reynolds, Schoelkopf, Skowron, Sutawika, Tang, Thite, Wang, Wang, and Zou]{eval-harness}
+Leo Gao, Jonathan Tow, Baber Abbasi, Stella Biderman, Sid Black, Anthony DiPofi, Charles Foster, Laurence Golding, Jeffrey Hsu, Alain Le~Noac'h, Haonan Li, Kyle McDonell, Niklas Muennighoff, Chris Ociepa, Jason Phang, Laria Reynolds, Hailey Schoelkopf, Aviya Skowron, Lintang Sutawika, Eric Tang, Anish Thite, Ben Wang, Kevin Wang, and Andy Zou.
+\newblock A framework for few-shot language model evaluation, 07 2024.
+\newblock URL \url{https://zenodo.org/records/12608602}.
+
+\bibitem[Groeneveld et~al.(2024)Groeneveld, Beltagy, Walsh, Bhagia, Kinney, Tafjord, Jha, Ivison, Magnusson, Wang, et~al.]{groeneveld2024olmo}
+Dirk Groeneveld, Iz~Beltagy, Pete Walsh, Akshita Bhagia, Rodney Kinney, Oyvind Tafjord, Ananya~Harsh Jha, Hamish Ivison, Ian Magnusson, Yizhong Wang, et~al.
+\newblock Olmo: Accelerating the science of language models.
+\newblock \emph{arXiv preprint arXiv:2402.00838}, 2024.
+
+\bibitem[Heo et~al.(2024)Heo, Kim, Kwon, Kim, Kwon, and Lee]{heo2024rethinking}
+Jung~Hwan Heo, Jeonghoon Kim, Beomseok Kwon, Byeongwook Kim, Se~Jung Kwon, and Dongsoo Lee.
+\newblock Rethinking channel dimensions to isolate outliers for low-bit weight quantization of large language models.
+\newblock In \emph{The Twelfth International Conference on Learning Representations}, 2024.
+\newblock URL \url{https://openreview.net/forum?id=JzG7kSpjJk}.
+
+\bibitem[Jiang et~al.(2023)Jiang, Sablayrolles, Mensch, Bamford, Chaplot, de~las Casas, Bressand, Lengyel, Lample, Saulnier, Lavaud, Lachaux, Stock, Scao, Lavril, Wang, Lacroix, and Sayed]{jiang2023mistral7b}
+Albert~Q. Jiang, Alexandre Sablayrolles, Arthur Mensch, Chris Bamford, Devendra~Singh Chaplot, Diego de~las Casas, Florian Bressand, Gianna Lengyel, Guillaume Lample, Lucile Saulnier, Lélio~Renard Lavaud, Marie-Anne Lachaux, Pierre Stock, Teven~Le Scao, Thibaut Lavril, Thomas Wang, Timothée Lacroix, and William~El Sayed.
+\newblock Mistral 7b, 2023.
+\newblock URL \url{https://arxiv.org/abs/2310.06825}.
+
+\bibitem[Kim et~al.(2024)Kim, Hooper, Gholami, Dong, Li, Shen, Mahoney, and Keutzer]{kim2024squeezellm}
+Sehoon Kim, Coleman Richard~Charles Hooper, Amir Gholami, Zhen Dong, Xiuyu Li, Sheng Shen, Michael~W. Mahoney, and Kurt Keutzer.
+\newblock Squeeze{LLM}: Dense-and-sparse quantization.
+\newblock In \emph{Forty-first International Conference on Machine Learning}, 2024.
+\newblock URL \url{https://openreview.net/forum?id=0jpbpFia8m}.
+
+\bibitem[Kovaleva et~al.(2021)Kovaleva, Kulshreshtha, Rogers, and Rumshisky]{kovaleva2021bert}
+Olga Kovaleva, Saurabh Kulshreshtha, Anna Rogers, and Anna Rumshisky.
+\newblock Bert busters: Outlier dimensions that disrupt transformers.
+\newblock \emph{arXiv preprint arXiv:2105.06990}, 2021.
+
+\bibitem[Lee et~al.(2024)Lee, Jin, Kim, Kim, and Park]{OWQ}
+Changhun Lee, Jungyu Jin, Taesu Kim, Hyungjun Kim, and Eunhyeok Park.
+\newblock Owq: Outlier-aware weight quantization for efficient fine-tuning and inference of large language models.
+\newblock \emph{Proceedings of the AAAI Conference on Artificial Intelligence}, 38\penalty0 (12):\penalty0 13355--13364, Mar. 2024.
+\newblock \doi{10.1609/aaai.v38i12.29237}.
+\newblock URL \url{https://ojs.aaai.org/index.php/AAAI/article/view/29237}.
+
+\bibitem[Lin et~al.(2024)Lin, Tang, Tang, Yang, Chen, Wang, Xiao, Dang, Gan, and Han]{lin2024awq}
+Ji~Lin, Jiaming Tang, Haotian Tang, Shang Yang, Wei-Ming Chen, Wei-Chen Wang, Guangxuan Xiao, Xingyu Dang, Chuang Gan, and Song Han.
+\newblock Awq: Activation-aware weight quantization for on-device llm compression and acceleration.
+\newblock \emph{Proceedings of Machine Learning and Systems}, 6:\penalty0 87--100, 2024.
+
+\bibitem[Liu et~al.(2024)Liu, Zhao, Fedorov, Soran, Choudhary, Krishnamoorthi, Chandra, Tian, and Blankevoort]{liu2024spinquant}
+Zechun Liu, Changsheng Zhao, Igor Fedorov, Bilge Soran, Dhruv Choudhary, Raghuraman Krishnamoorthi, Vikas Chandra, Yuandong Tian, and Tijmen Blankevoort.
+\newblock Spinquant--llm quantization with learned rotations.
+\newblock \emph{arXiv preprint arXiv:2405.16406}, 2024.
+
+\bibitem[Merity et~al.(2017)Merity, Xiong, Bradbury, and Socher]{merity2017pointer}
+Stephen Merity, Caiming Xiong, James Bradbury, and Richard Socher.
+\newblock Pointer sentinel mixture models.
+\newblock In \emph{International Conference on Learning Representations}, 2017.
+\newblock URL \url{https://openreview.net/forum?id=Byj72udxe}.
+
+\bibitem[Paperno et~al.(2016)Paperno, Kruszewski, Lazaridou, Pham, Bernardi, Pezzelle, Baroni, Boleda, and Fern{\'a}ndez]{paperno-etal-2016-lambada}
+Denis Paperno, Germ{\'a}n Kruszewski, Angeliki Lazaridou, Ngoc~Quan Pham, Raffaella Bernardi, Sandro Pezzelle, Marco Baroni, Gemma Boleda, and Raquel Fern{\'a}ndez.
+\newblock The {LAMBADA} dataset: Word prediction requiring a broad discourse context.
+\newblock In Katrin Erk and Noah~A. Smith (eds.), \emph{Proceedings of the 54th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)}, pp.\  1525--1534, Berlin, Germany, August 2016. Association for Computational Linguistics.
+\newblock \doi{10.18653/v1/P16-1144}.
+\newblock URL \url{https://aclanthology.org/P16-1144}.
+
+\bibitem[Raffel et~al.(2020)Raffel, Shazeer, Roberts, Lee, Narang, Matena, Zhou, Li, and Liu]{c4}
+Colin Raffel, Noam Shazeer, Adam Roberts, Katherine Lee, Sharan Narang, Michael Matena, Yanqi Zhou, Wei Li, and Peter~J Liu.
+\newblock Exploring the limits of transfer learning with a unified text-to-text transformer.
+\newblock \emph{Journal of machine learning research}, 21\penalty0 (140):\penalty0 1--67, 2020.
+
+\bibitem[Sakaguchi et~al.(2021)Sakaguchi, Bras, Bhagavatula, and Choi]{10.1145/3474381}
+Keisuke Sakaguchi, Ronan~Le Bras, Chandra Bhagavatula, and Yejin Choi.
+\newblock Winogrande: an adversarial winograd schema challenge at scale.
+\newblock \emph{Commun. ACM}, 64\penalty0 (9):\penalty0 99–106, aug 2021.
+\newblock ISSN 0001-0782.
+\newblock \doi{10.1145/3474381}.
+\newblock URL \url{https://doi.org/10.1145/3474381}.
+
+\bibitem[Shao et~al.(2024)Shao, Chen, Zhang, Xu, Zhao, Li, Zhang, Gao, Qiao, and Luo]{shao2024omniquant}
+Wenqi Shao, Mengzhao Chen, Zhaoyang Zhang, Peng Xu, Lirui Zhao, Zhiqian Li, Kaipeng Zhang, Peng Gao, Yu~Qiao, and Ping Luo.
+\newblock Omniquant: Omnidirectionally calibrated quantization for large language models.
+\newblock In \emph{The Twelfth International Conference on Learning Representations}, 2024.
+\newblock URL \url{https://openreview.net/forum?id=8Wuvhh0LYW}.
+
+\bibitem[Son et~al.(2024)Son, Park, Han, Kim, and Lee]{son2024prefixing}
+Seungwoo Son, Wonpyo Park, Woohyun Han, Kyuyeun Kim, and Jaeho Lee.
+\newblock Prefixing attention sinks can mitigate activation outliers for large language model quantization.
+\newblock \emph{arXiv preprint arXiv:2406.12016}, 2024.
+
+\bibitem[Sun et~al.(2024)Sun, Chen, Kolter, and Liu]{sun2024massive}
+Mingjie Sun, Xinlei Chen, J~Zico Kolter, and Zhuang Liu.
+\newblock Massive activations in large language models.
+\newblock In \emph{ICLR 2024 Workshop on Mathematical and Empirical Understanding of Foundation Models}, 2024.
+\newblock URL \url{https://openreview.net/forum?id=1ayU4fMqme}.
+
+\bibitem[Touvron et~al.(2023)Touvron, Lavril, Izacard, Martinet, Lachaux, Lacroix, Rozière, Goyal, Hambro, Azhar, Rodriguez, Joulin, Grave, and Lample]{touvron2023llamaopenefficientfoundation}
+Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier Martinet, Marie-Anne Lachaux, Timothée Lacroix, Baptiste Rozière, Naman Goyal, Eric Hambro, Faisal Azhar, Aurelien Rodriguez, Armand Joulin, Edouard Grave, and Guillaume Lample.
+\newblock Llama: Open and efficient foundation language models, 2023.
+\newblock URL \url{https://arxiv.org/abs/2302.13971}.
+
+\bibitem[Wei et~al.(2022)Wei, Zhang, Zhang, Gong, Zhang, Zhang, Yu, and Liu]{NEURIPS2022_6f6db140}
+Xiuying Wei, Yunchen Zhang, Xiangguo Zhang, Ruihao Gong, Shanghang Zhang, Qi~Zhang, Fengwei Yu, and Xianglong Liu.
+\newblock Outlier suppression: Pushing the limit of low-bit transformer language models.
+\newblock In S.~Koyejo, S.~Mohamed, A.~Agarwal, D.~Belgrave, K.~Cho, and A.~Oh (eds.), \emph{Advances in Neural Information Processing Systems}, volume~35, pp.\  17402--17414. Curran Associates, Inc., 2022.
+\newblock URL \url{https://proceedings.neurips.cc/paper_files/paper/2022/file/6f6db140de9c9f111b12ef8a216320a9-Paper-Conference.pdf}.
+
+\bibitem[Wei et~al.(2023)Wei, Zhang, Li, Zhang, Gong, Guo, and Liu]{wei-etal-2023-outlier}
+Xiuying Wei, Yunchen Zhang, Yuhang Li, Xiangguo Zhang, Ruihao Gong, Jinyang Guo, and Xianglong Liu.
+\newblock Outlier suppression+: Accurate quantization of large language models by equivalent and effective shifting and scaling.
+\newblock In Houda Bouamor, Juan Pino, and Kalika Bali (eds.), \emph{Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing}, pp.\  1648--1665, Singapore, December 2023. Association for Computational Linguistics.
+\newblock \doi{10.18653/v1/2023.emnlp-main.102}.
+\newblock URL \url{https://aclanthology.org/2023.emnlp-main.102}.
+
+\bibitem[Xiao et~al.(2023)Xiao, Lin, Seznec, Wu, Demouth, and Han]{10.5555/3618408.3619993}
+Guangxuan Xiao, Ji~Lin, Mickael Seznec, Hao Wu, Julien Demouth, and Song Han.
+\newblock Smoothquant: accurate and efficient post-training quantization for large language models.
+\newblock In \emph{Proceedings of the 40th International Conference on Machine Learning}, ICML'23. JMLR.org, 2023.
+
+\bibitem[Xiao et~al.(2024)Xiao, Tian, Chen, Han, and Lewis]{xiao2024efficient}
+Guangxuan Xiao, Yuandong Tian, Beidi Chen, Song Han, and Mike Lewis.
+\newblock Efficient streaming language models with attention sinks.
+\newblock In \emph{The Twelfth International Conference on Learning Representations}, 2024.
+\newblock URL \url{https://openreview.net/forum?id=NG7sS51zVF}.
+
+\bibitem[Yang et~al.(2024)Yang, Kim, and Kim]{yang2024mitigating}
+Jaewoo Yang, Hayun Kim, and Younghoon Kim.
+\newblock Mitigating quantization errors due to activation spikes in glu-based llms.
+\newblock \emph{arXiv preprint arXiv:2405.14428}, 2024.
+
+\bibitem[Zellers et~al.(2019)Zellers, Holtzman, Bisk, Farhadi, and Choi]{zellers-etal-2019-hellaswag}
+Rowan Zellers, Ari Holtzman, Yonatan Bisk, Ali Farhadi, and Yejin Choi.
+\newblock {H}ella{S}wag: Can a machine really finish your sentence?
+\newblock In Anna Korhonen, David Traum, and Llu{\'\i}s M{\`a}rquez (eds.), \emph{Proceedings of the 57th Annual Meeting of the Association for Computational Linguistics}, pp.\  4791--4800, Florence, Italy, July 2019. Association for Computational Linguistics.
+\newblock \doi{10.18653/v1/P19-1472}.
+\newblock URL \url{https://aclanthology.org/P19-1472}.
+
+\end{thebibliography}
