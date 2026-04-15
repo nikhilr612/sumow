@@ -1,0 +1,3 @@
+[submodule "llmsuperweight"]
+	path = llmsuperweight
+	url = https://github.com/mengxiayu/llmsuperweight
