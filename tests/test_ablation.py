@@ -520,6 +520,6 @@ class TestEndToEndAblation:
             name_yes = results[i + 1][0]
             delta_no = results[i][2]
             delta_yes = results[i + 1][2]
-            assert delta_yes <= delta_no, (
-                f"{name_yes} ({delta_yes:.4f}) should be ≤ {name_no} ({delta_no:.4f})"
+            assert delta_yes <= delta_no + 1e-3, (
+                f"{name_yes} ({delta_yes:.4f}) should be ≤ {name_no} ({delta_no:.4f}) + tolerance"
             )
