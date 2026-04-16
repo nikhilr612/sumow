@@ -27,6 +27,7 @@ from sumow.model import (
     RotaryEmbedding,
     TransformerConfig,
     apply_rotary_pos_emb,
+    forward_jit,
     load_weights_into_model,
     make_hf_weights_dict,
     repeat_kv,
@@ -512,3 +513,36 @@ class TestEndToEnd:
         logits, stats = model(ids, capture_activations=True)
         assert logits.shape == (3, 32)
         assert len(stats) == 1
+
+
+# ---------------------------------------------------------------------------
+# JIT-compiled forward pass
+# ---------------------------------------------------------------------------
+
+
+class TestForwardJit:
+    def test_jit_matches_eager(self):
+        """JIT forward should produce same results as eager."""
+        cfg = TINY_CONFIG
+        model = LlamaModel(cfg)
+        leaves, treedef = jax.tree.flatten(model)
+        new_leaves = [
+            jax.random.normal(jax.random.PRNGKey(i), l.shape) * 0.02
+            if isinstance(l, jnp.ndarray) and l.dtype == jnp.float32
+            else l
+            for i, l in enumerate(leaves)
+        ]
+        model = jax.tree.unflatten(treedef, new_leaves)
+
+        ids = jnp.arange(8)
+        logits_eager, _ = model(ids, capture_activations=False)
+        logits_jit = forward_jit(model, ids)
+        np.testing.assert_allclose(logits_eager, logits_jit, atol=1e-5)
+
+    def test_jit_different_lengths(self):
+        """JIT should work with different sequence lengths (recompiles)."""
+        model = LlamaModel(MICRO_CONFIG)
+        for length in [1, 4, 8]:
+            ids = jnp.arange(length)
+            logits = forward_jit(model, ids)
+            assert logits.shape == (length, MICRO_CONFIG.vocab_size)

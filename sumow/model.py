@@ -500,3 +500,22 @@ def make_hf_weights_dict(model: LlamaModel) -> dict[str, Array]:
     weights["lm_head.weight"] = model.lm_head
 
     return weights
+
+
+# ---------------------------------------------------------------------------
+# JIT-compiled forward pass
+# ---------------------------------------------------------------------------
+
+
+@eqx.filter_jit
+def forward_jit(
+    model: LlamaModel,
+    input_ids: Int[Array, "seq"],
+) -> Float[Array, "seq vocab"]:
+    """JIT-compiled forward pass (without activation capture).
+
+    Use this for inference and evaluation. For SW identification,
+    use ``model(input_ids, capture_activations=True)`` without JIT.
+    """
+    logits, _ = model(input_ids, capture_activations=False)
+    return logits
