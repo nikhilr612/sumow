@@ -1,9 +1,4 @@
-FIX:reference_equiv_tests_25_failures
-COMMIT:beartype_decorators_and_equiv_tests
-BUILD:sumow/model.py_equinox_transformer
-TEST:model_transformer_tests
-COMMIT:transformer_model
-SMOKE:run_pipeline_on_tiny_model
+SMOKE:end_to_end_pipeline_tiny_model
 BENCH:compare_ppl_to_paper_table1
 OPTIMIZE:profile_and_speed_up_hot_paths
 ABLATE:test_without_super_weight_retention
