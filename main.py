@@ -66,16 +66,18 @@ def cmd_quantize(args: argparse.Namespace) -> None:
     quantized_count = 0
     for layer_idx, w in sorted(down_proj.items()):
         layer_sw = sw_by_layer.get(layer_idx, [])
-        q_w = quantize_weight_sw_aware(
+        result = quantize_weight_sw_aware(
             w,
             layer_sw,
             nbits=quant_cfg.nbits,
             blocksize=quant_cfg.blocksize,
-            z_threshold=quant_cfg.clip_threshold,
+            clip_method="zscore",
+            clip_threshold=quant_cfg.clip_threshold,
         )
-        err = float(jnp.mean(jnp.abs(w - q_w)))
-        print(f"  Layer {layer_idx}: mean abs error = {err:.6f}" +
-              (f" (SW restored: {layer_sw})" if layer_sw else ""))
+        err = float(jnp.mean(jnp.abs(w - result.weight)))
+        sw_info = f" (SW restored: {layer_sw})" if layer_sw else ""
+        outlier_info = f" ({result.num_outliers} outliers clipped)" if result.num_outliers else ""
+        print(f"  Layer {layer_idx}: mean abs error = {err:.6f}{sw_info}{outlier_info}")
         quantized_count += 1
 
     print(f"\nQuantized {quantized_count}/{total_layers} down_proj layers "
