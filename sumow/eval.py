@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Float, Int
+from beartype import beartype
+from jaxtyping import jaxtyped,  Array, Float, Int
 
 
+@jaxtyped(typechecker=beartype)
 def cross_entropy_loss(
     logits: Float[Array, "seq vocab"],
     targets: Int[Array, "seq"],
@@ -31,6 +33,7 @@ def cross_entropy_loss(
     return -jnp.mean(target_log_probs)
 
 
+@jaxtyped(typechecker=beartype)
 def perplexity_from_loss(loss: float) -> float:
     """Convert cross-entropy loss to perplexity.
 
@@ -39,6 +42,7 @@ def perplexity_from_loss(loss: float) -> float:
     return float(jnp.exp(loss))
 
 
+@jaxtyped(typechecker=beartype)
 def perplexity(
     logits: Float[Array, "seq vocab"],
     targets: Int[Array, "seq"],

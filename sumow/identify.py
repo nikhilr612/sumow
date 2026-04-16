@@ -18,7 +18,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import jax.numpy as jnp
-from jaxtyping import Array, Float
+from beartype import beartype
+from jaxtyping import jaxtyped,  Array, Float
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,7 @@ class LayerActivationStats:
     output_max_channel: int  # channel (feature dim index) of max output activation
 
 
+@jaxtyped(typechecker=beartype)
 def detect_spikes(
     stats: list[LayerActivationStats],
     spike_threshold: float = 100.0,
@@ -88,6 +90,7 @@ def detect_spikes(
     return sorted(spikes, key=lambda s: s.input_max_magnitude, reverse=True)
 
 
+@jaxtyped(typechecker=beartype)
 def identify_super_weights(
     stats: list[LayerActivationStats],
     spike_threshold: float = 100.0,
@@ -122,6 +125,7 @@ def identify_super_weights(
     return super_weights
 
 
+@jaxtyped(typechecker=beartype)
 def compute_layer_stats(
     input_act: Float[Array, "seq hidden"],
     output_act: Float[Array, "seq features"],

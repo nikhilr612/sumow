@@ -20,7 +20,8 @@ from typing import NamedTuple
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Float, Int
+from beartype import beartype
+from jaxtyping import Array, Float, Int, jaxtyped
 
 
 # ---------------------------------------------------------------------------
@@ -71,6 +72,7 @@ class QuantizeResult:
 # ---------------------------------------------------------------------------
 
 
+@jaxtyped(typechecker=beartype)
 def quantize_rtn(
     x: Float[Array, "*dims"],
     nbits: int = 4,
@@ -94,6 +96,7 @@ def quantize_rtn(
     return q, delta, x_min
 
 
+@jaxtyped(typechecker=beartype)
 def dequantize_rtn(
     q: Int[Array, "*dims"],
     delta: Float[Array, ""],
@@ -103,6 +106,7 @@ def dequantize_rtn(
     return delta * q.astype(jnp.float32) + x_min
 
 
+@jaxtyped(typechecker=beartype)
 def quantize_dequantize(
     x: Float[Array, "*dims"],
     nbits: int = 4,
@@ -117,6 +121,7 @@ def quantize_dequantize(
 # ---------------------------------------------------------------------------
 
 
+@jaxtyped(typechecker=beartype)
 def quantize_dequantize_blockwise(
     weight: Float[Array, "rows cols"],
     nbits: int = 4,
@@ -159,14 +164,18 @@ def quantize_dequantize_blockwise(
         if clip_method == "block_percentage":
             flat, num_outliers = clip_block_percentage(flat, clip_threshold)
         elif clip_method == "tensor_percentage":
-            clipped = clip_percentage(flat.reshape(shape), clip_threshold)
-            num_outliers = int(jnp.sum(jnp.abs(flat) > jnp.abs(clipped.reshape(flat.shape))))
-            flat = clipped.reshape(flat.shape)
+            # Match reference: compute threshold on full tensor, count outliers, then clamp
+            abs_flat = jnp.abs(flat)
+            k = max(int(flat.size * clip_threshold), 1)
+            sorted_abs = jnp.sort(abs_flat.reshape(-1))
+            threshold = sorted_abs[-k]
+            num_outliers = int(jnp.sum(abs_flat > threshold))
+            flat = jnp.clip(flat, -threshold, threshold)
         elif clip_method == "zscore":
             abs_flat = jnp.abs(flat)
             means = jnp.mean(abs_flat, axis=1, keepdims=True)
-            stds = jnp.std(abs_flat, axis=1, keepdims=True)
-            threshold = means + clip_threshold * stds
+            stds = jnp.std(abs_flat, axis=1, keepdims=True, ddof=1)
+            threshold = clip_threshold * stds + means
             num_outliers = int(jnp.sum(abs_flat > threshold))
             flat = jnp.clip(flat, -threshold, threshold)
         elif clip_method == "iqr":
@@ -177,21 +186,29 @@ def quantize_dequantize_blockwise(
 
     # Quantize
     if use_normal_float:
-        # NF4/NF3 path
-        result = quantize_dequantize_nf(flat.reshape(shape), nbits, blocksize)
-    elif scale_shift:
-        result = quantize_dequantize_scale_shift(flat.reshape(shape), nbits, blocksize)
-    else:
-        # Standard INT RTN path
+        # NF4/NF3 path — operate on already-clipped flat data
         block_min = jnp.min(flat, axis=1, keepdims=True)
         block_max = jnp.max(flat, axis=1, keepdims=True)
-        qmax = (1 << nbits) - 1
-        delta = (block_max - block_min) / qmax
-        delta = jnp.where(delta == 0, jnp.ones_like(delta), delta)
-
-        q = jnp.round((flat - block_min) / delta).astype(jnp.int32)
-        q = jnp.clip(q, 0, qmax)
-        result = (delta * q.astype(jnp.float32) + block_min).reshape(shape)
+        result = _quantize_nf_from_blocks(flat, block_min, block_max, nbits).reshape(shape)
+    elif scale_shift:
+        # Scale-shift path — matches reference in-place chain exactly:
+        # weight.sub_(min).mul_(scale).sub_(0.49).round_().add_(0.49).div_(scale).add_(min)
+        block_min = jnp.min(flat, axis=1, keepdims=True)
+        block_max = jnp.max(flat, axis=1, keepdims=True)
+        scale = ((1 << nbits) - 0.01) / (block_max - block_min)
+        scale = jnp.where(jnp.isinf(scale), jnp.ones_like(scale), scale)
+        q = (flat - block_min) * scale - 0.49
+        q = jnp.round(q)
+        result = ((q + 0.49) / scale + block_min).reshape(shape)
+    else:
+        # Standard INT RTN — matches reference in-place chain exactly:
+        # weight.sub_(min).mul_(scale).round_().div_(scale).add_(min)
+        block_min = jnp.min(flat, axis=1, keepdims=True)
+        block_max = jnp.max(flat, axis=1, keepdims=True)
+        scale = jnp.float32((1 << nbits) - 1) / (block_max - block_min)
+        scale = jnp.where(jnp.isinf(scale), jnp.ones_like(scale), scale)
+        q = jnp.round((flat - block_min) * scale)
+        result = (q / scale + block_min).reshape(shape)
 
     return QuantizeResult(weight=result, num_outliers=num_outliers)
 
@@ -201,6 +218,7 @@ def quantize_dequantize_blockwise(
 # ---------------------------------------------------------------------------
 
 
+@jaxtyped(typechecker=beartype)
 def clip_zscore(
     weight: Float[Array, "*dims"],
     z_threshold: float = 9.0,
@@ -217,22 +235,24 @@ def clip_zscore(
     return jnp.clip(weight, -threshold, threshold)
 
 
+@jaxtyped(typechecker=beartype)
 def clip_percentage(
     weight: Float[Array, "*dims"],
     percentage: float = 1e-6,
 ) -> Float[Array, "*dims"]:
     """Clip the top `percentage` of values by magnitude (per-tensor).
 
-    Values strictly above the threshold (the k-th largest |value|) are clamped.
+    Threshold = the k-th largest |value|. Values strictly above are clamped.
+    Matches reference: topk(k).values[-1].
     """
     abs_weight = jnp.abs(weight)
     k = max(int(weight.size * percentage), 1)
-    # Threshold = the (k+1)-th largest abs value, so the top-k are clipped
     sorted_abs = jnp.sort(abs_weight.reshape(-1))
-    threshold = sorted_abs[-(k + 1)] if k < weight.size else sorted_abs[0]
+    threshold = sorted_abs[-k]
     return jnp.clip(weight, -threshold, threshold)
 
 
+@jaxtyped(typechecker=beartype)
 def clip_block_percentage(
     weight: Float[Array, "blocks blocksize"],
     percentage: float = 1e-6,
@@ -254,6 +274,7 @@ def clip_block_percentage(
     return clipped, num_outliers
 
 
+@jaxtyped(typechecker=beartype)
 def clip_iqr(
     weight: Float[Array, "*dims"],
     factor: float = 1.5,
@@ -286,6 +307,36 @@ def clip_iqr(
 # ---------------------------------------------------------------------------
 
 
+def _quantize_nf_from_blocks(
+    flat: jnp.ndarray,
+    block_min: jnp.ndarray,
+    block_max: jnp.ndarray,
+    nbits: int,
+) -> jnp.ndarray:
+    """NF quantization on pre-blocked data with pre-computed min/max.
+
+    Matches reference: sub_(min).mul_(scale).sub_(1).round_to_poles.add_(1).div_(scale).add_(min)
+    """
+    if nbits == 4:
+        levels = NF4_LEVELS
+    elif nbits == 3:
+        levels = NF3_LEVELS
+    else:
+        raise ValueError(f"Normal float quantization only supports 3 and 4 bits, got {nbits}")
+
+    poles = jnp.array(levels, dtype=jnp.float32)
+
+    scale = 2.0 / (block_max - block_min)
+    scale = jnp.where(jnp.isinf(scale), jnp.ones_like(scale), scale)
+
+    normalized = (flat - block_min) * scale - 1.0
+    quantized = round_to_nearest_pole(normalized, poles)
+
+    # Map back: (q + 1) / scale + min
+    return (quantized + 1.0) / scale + block_min
+
+
+@jaxtyped(typechecker=beartype)
 def round_to_nearest_pole(
     x: Float[Array, "*dims"],
     poles: Float[Array, "num_poles"],
@@ -299,6 +350,7 @@ def round_to_nearest_pole(
     return poles[nearest_idx].reshape(shape)
 
 
+@jaxtyped(typechecker=beartype)
 def quantize_dequantize_nf(
     weight: Float[Array, "rows cols"],
     nbits: int = 4,
@@ -345,6 +397,7 @@ def quantize_dequantize_nf(
 # ---------------------------------------------------------------------------
 
 
+@jaxtyped(typechecker=beartype)
 def quantize_dequantize_scale_shift(
     weight: Float[Array, "rows cols"],
     nbits: int = 4,
@@ -379,10 +432,11 @@ def quantize_dequantize_scale_shift(
 # ---------------------------------------------------------------------------
 
 
+@jaxtyped(typechecker=beartype)
 def quantize_dequantize_per_channel(
     weight: Float[Array, "rows cols"],
     nbits: int = 4,
-) -> Float[Array, "rows cols"]:
+) -> QuantizeResult:
     """Per-channel (per-row) quantization.
 
     Each output channel (row) is quantized independently with its own scale/zero.
@@ -396,6 +450,7 @@ def quantize_dequantize_per_channel(
 # ---------------------------------------------------------------------------
 
 
+@jaxtyped(typechecker=beartype)
 def pack_4bit_to_int8(
     quantized: Int[Array, "rows cols"],
 ) -> Int[Array, "rows packed_cols"]:
@@ -415,6 +470,7 @@ def pack_4bit_to_int8(
     return packed.astype(jnp.int8)
 
 
+@jaxtyped(typechecker=beartype)
 def unpack_int8_to_4bit(
     packed: Int[Array, "rows packed_cols"],
 ) -> Int[Array, "rows unpacked_cols"]:
@@ -432,6 +488,7 @@ def unpack_int8_to_4bit(
 # ---------------------------------------------------------------------------
 
 
+@jaxtyped(typechecker=beartype)
 def scale_super_weights(
     weight: Float[Array, "rows cols"],
     sw_coords: list[tuple[int, int]],
@@ -453,6 +510,7 @@ def scale_super_weights(
 # ---------------------------------------------------------------------------
 
 
+@jaxtyped(typechecker=beartype)
 def quantize_weight_sw_aware(
     weight: Float[Array, "rows cols"],
     sw_coords: list[tuple[int, int]],
@@ -515,6 +573,7 @@ def quantize_weight_sw_aware(
 # ---------------------------------------------------------------------------
 
 
+@jaxtyped(typechecker=beartype)
 def quantize_activation_sa_aware(
     activation: Float[Array, "batch seq hidden"],
     sa_positions: list[tuple[int, int]],

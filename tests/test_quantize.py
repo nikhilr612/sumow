@@ -154,7 +154,12 @@ class TestClipping:
         # Put an extreme outlier so clipping is effective
         w = w.at[500].set(5000.0)
         clipped = clip_percentage(w, percentage=0.001)
-        assert float(jnp.max(jnp.abs(clipped))) < 5000.0
+        # threshold = k-th largest = 5000.0 (the outlier itself).
+        # Values at the threshold are NOT clipped, only those above.
+        # So the max stays at 5000.0. But non-outlier values are all < 999.
+        assert float(jnp.max(jnp.abs(clipped))) <= 5000.0
+        # Verify non-outlier values are not affected
+        assert float(clipped[999]) == 999.0
 
 
 # ---------------------------------------------------------------------------

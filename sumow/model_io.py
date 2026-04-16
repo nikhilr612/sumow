@@ -11,12 +11,14 @@ from pathlib import Path
 from typing import Any
 
 import jax.numpy as jnp
-from jaxtyping import Array, Float
+from beartype import beartype
+from jaxtyping import jaxtyped,  Array, Float
 from safetensors import safe_open
 
 from sumow.config import SUPER_WEIGHT_DIRECTORY
 
 
+@jaxtyped(typechecker=beartype)
 def load_safetensors(path: str | Path) -> dict[str, Array]:
     """Load all tensors from a safetensors file into JAX arrays.
 
@@ -33,6 +35,7 @@ def load_safetensors(path: str | Path) -> dict[str, Array]:
     return tensors
 
 
+@jaxtyped(typechecker=beartype)
 def load_model_weights(model_dir: str | Path) -> dict[str, Array]:
     """Load all safetensors files from a model directory.
 
@@ -55,6 +58,7 @@ def load_model_weights(model_dir: str | Path) -> dict[str, Array]:
     return tensors
 
 
+@jaxtyped(typechecker=beartype)
 def extract_down_proj_weights(
     weights: dict[str, Array],
     down_proj_pattern: str = "down_proj.weight",
@@ -83,6 +87,7 @@ def extract_down_proj_weights(
     return down_proj_weights
 
 
+@jaxtyped(typechecker=beartype)
 def get_super_weight_values(
     weights: dict[str, Array],
     model_id: str,
