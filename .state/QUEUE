@@ -1,6 +1,4 @@
-SMOKE:end_to_end_pipeline_tiny_model
-BENCH:compare_ppl_to_paper_table1
-OPTIMIZE:profile_and_speed_up_hot_paths
-ABLATE:test_without_super_weight_retention
 HARDEN:edge_cases_and_stress_tests
+OPTIMIZE:jit_hot_paths
+ABLATE:test_without_super_weight_retention
 BENCH:final_numbers_vs_paper
