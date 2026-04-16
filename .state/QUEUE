@@ -1,4 +1,4 @@
-HARDEN:edge_cases_and_stress_tests
-OPTIMIZE:jit_hot_paths
-ABLATE:test_without_super_weight_retention
-BENCH:final_numbers_vs_paper
+BENCH:benchmark_infrastructure
+OPTIMIZE:activation_quantization_tests
+HARDEN:serialization_and_roundtrip
+DOCS:update_readme
