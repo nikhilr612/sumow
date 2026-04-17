@@ -14,7 +14,6 @@ Key design choices:
 
 from __future__ import annotations
 
-from dataclasses import field
 from typing import NamedTuple
 
 import equinox as eqx
@@ -122,7 +121,6 @@ class RotaryEmbedding(eqx.Module):
         max_position_embeddings: int = 2048,
         rope_theta: float = 10000.0,
     ):
-        half_dim = head_dim // 2
         inv_freq = 1.0 / (
             rope_theta ** (jnp.arange(0, head_dim, 2, dtype=jnp.float32) / head_dim)
         )
@@ -205,7 +203,10 @@ class LlamaAttention(eqx.Module):
         self.k_proj = jnp.zeros((self.num_kv_heads * self.head_dim, hidden))
         self.v_proj = jnp.zeros((self.num_kv_heads * self.head_dim, hidden))
         self.o_proj = jnp.zeros((hidden, self.num_heads * self.head_dim))
-        self.rotary_emb = RotaryEmbedding(
+        self.rotary_emb = RotaryEmbedding(  # type: ignore[assignment]
+            # equinox's Module.__new__ is typed as returning Module (the base
+            # class), not the concrete subclass.  This is a known stub
+            # imprecision; at runtime the value IS a RotaryEmbedding.
             self.head_dim,
             config.max_position_embeddings,
             config.rope_theta,
@@ -304,10 +305,13 @@ class LlamaBlock(eqx.Module):
     post_attention_layernorm: RMSNorm
 
     def __init__(self, config: TransformerConfig):
-        self.self_attn = LlamaAttention(config)
-        self.mlp = LlamaMLP(config)
-        self.input_layernorm = RMSNorm(config.hidden_size, config.rms_norm_eps)
-        self.post_attention_layernorm = RMSNorm(
+        # equinox's Module.__new__ returns Module (not the concrete subclass),
+        # so ty flags these assignments as type mismatches.  At runtime the
+        # values ARE the concrete types declared in the class body.
+        self.self_attn = LlamaAttention(config)  # type: ignore[assignment]
+        self.mlp = LlamaMLP(config)  # type: ignore[assignment]
+        self.input_layernorm = RMSNorm(config.hidden_size, config.rms_norm_eps)  # type: ignore[assignment]
+        self.post_attention_layernorm = RMSNorm(  # type: ignore[assignment]
             config.hidden_size, config.rms_norm_eps
         )
 
@@ -346,8 +350,10 @@ class LlamaModel(eqx.Module):
     def __init__(self, config: TransformerConfig):
         self.config = config
         self.embed_tokens = jnp.zeros((config.vocab_size, config.hidden_size))
-        self.layers = [LlamaBlock(config) for _ in range(config.num_hidden_layers)]
-        self.norm = RMSNorm(config.hidden_size, config.rms_norm_eps)
+        # equinox's Module.__new__ returns Module (not the concrete subclass),
+        # so ty flags these assignments as type mismatches.
+        self.layers = [LlamaBlock(config) for _ in range(config.num_hidden_layers)]  # type: ignore[assignment]
+        self.norm = RMSNorm(config.hidden_size, config.rms_norm_eps)  # type: ignore[assignment]
         self.lm_head = jnp.zeros((config.vocab_size, config.hidden_size))
 
     @jaxtyped(typechecker=beartype)

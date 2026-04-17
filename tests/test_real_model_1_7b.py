@@ -40,8 +40,8 @@ def _load_model():
     config = TransformerConfig(**{k: c[k] for k in TransformerConfig._fields if k in c})
     model = LlamaModel(config)
     weights = load_model_weights(str(WEIGHTS_DIR))
-    model = load_weights_into_model(model, weights)
-    return model, config
+    model = load_weights_into_model(model, weights)  # type: ignore[invalid-argument-type]
+    # model is typed as Module (equinox stub issue) rather than LlamaModel
 
 
 def _compute_ppl(model, token_seqs):
@@ -87,7 +87,9 @@ def eval_seqs():
         "The capital of France is Paris, known for the Eiffel Tower and cultural heritage.",
         "Machine learning algorithms are used in healthcare, finance, and transportation.",
     ]
-    return [tok.encode(t) for t in texts]
+    return [tok.encode(t) for t in texts]  # type: ignore[attr-defined]
+    # AutoTokenizer.from_pretrained returns a broad PreTrainedTokenizerBase union
+    # that ty resolves to the base class, which lacks the concrete .encode method.
 
 
 @needs_weights
@@ -211,6 +213,10 @@ class TestSuperWeightImpact1_7B:
                 if best_non_sw is None or mag > best_non_sw[3]:
                     best_non_sw = (li, r, c, mag)
 
+        assert best_non_sw is not None, (
+            "No non-super-weight found — every weight in the model is a super weight, "
+            "which would indicate a bug in SW identification."
+        )
         model_z = _zero_weight(model, *best_non_sw[:3])
         non_sw_ratio = _compute_ppl(model_z, eval_seqs) / ppl_base
 

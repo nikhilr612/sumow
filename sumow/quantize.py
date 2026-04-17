@@ -15,10 +15,8 @@ All functions are pure and JIT-compatible where noted.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import NamedTuple
+from dataclasses import dataclass
 
-import jax
 import jax.numpy as jnp
 from beartype import beartype
 from jaxtyping import Array, Float, Int, jaxtyped

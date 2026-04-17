@@ -4,8 +4,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 MAIN = Path(__file__).parent.parent / "main.py"
 
 
@@ -64,7 +62,7 @@ class TestIdentifyCommand:
 
     def test_phi3_has_6_sws(self):
         r = _run("identify", "microsoft/Phi-3-mini-4k-instruct")
-        lines = [l for l in r.stdout.strip().split("\n") if "layers[" in l]
+        lines = [line for line in r.stdout.strip().split("\n") if "layers[" in line]
         assert len(lines) == 6
 
 

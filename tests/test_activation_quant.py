@@ -11,7 +11,6 @@ Verifies:
 
 import jax.numpy as jnp
 import numpy as np
-import pytest
 
 from sumow.quantize import quantize_activation_sa_aware
 

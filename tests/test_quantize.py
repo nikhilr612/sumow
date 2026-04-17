@@ -22,8 +22,6 @@ from sumow.quantize import (
     round_to_nearest_pole,
     scale_super_weights,
     unpack_int8_to_4bit,
-    NF4_LEVELS,
-    NF3_LEVELS,
 )
 
 

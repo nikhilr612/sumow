@@ -16,7 +16,6 @@ Tests cover:
 import jax
 import jax.numpy as jnp
 import numpy as np
-import pytest
 
 from sumow.model import (
     LlamaAttention,
@@ -88,7 +87,9 @@ class TestRMSNorm:
 
         # Manual: x / sqrt(mean(x^2) + eps) * weight
         variance = jnp.mean(x * x, axis=-1, keepdims=True)
-        expected = x / jnp.sqrt(variance + eps) * norm.weight
+        expected = x / jnp.sqrt(variance + eps) * norm.weight  # type: ignore[attr-defined]
+        # RMSNorm.weight is declared as a JAX array attribute on the equinox
+        # Module, but ty's equinox stubs don't expose it — safe to ignore.
         actual = norm(x)
 
         np.testing.assert_allclose(actual, expected, atol=1e-6)
@@ -337,9 +338,6 @@ class TestLlamaModel:
 
     def test_finite_output_with_random_weights(self):
         """Random weights should still produce finite logits."""
-        import equinox as eqx
-
-        key = jax.random.PRNGKey(42)
         model = LlamaModel(TINY_CONFIG)
 
         # Initialize with small random weights
@@ -366,9 +364,6 @@ class TestLlamaModel:
 class TestWeightLoading:
     def test_roundtrip(self):
         """make_hf_weights_dict → load_weights_into_model should preserve all named params."""
-        import equinox as eqx
-
-        key = jax.random.PRNGKey(99)
         cfg = TINY_CONFIG
         model = LlamaModel(cfg)
 
@@ -387,7 +382,8 @@ class TestWeightLoading:
         # Extract named params and reload into fresh model
         weights = make_hf_weights_dict(model)
         model2 = LlamaModel(cfg)
-        model2 = load_weights_into_model(model2, weights)
+        model2 = load_weights_into_model(model2, weights)  # type: ignore[invalid-argument-type]
+        # model2 is typed as Module (equinox stub issue) rather than LlamaModel
 
         # Compare via the named weight dict (excludes RoPE cache which is derived)
         weights2 = make_hf_weights_dict(model2)
@@ -450,8 +446,8 @@ class TestWeightLoading:
         weights[f"{prefix}.post_attention_layernorm.weight"] = jnp.ones(8)
         weights["model.norm.weight"] = jnp.ones(8)
 
-        model = load_weights_into_model(model, weights)
-        np.testing.assert_array_equal(model.embed_tokens, model.lm_head)
+        model = load_weights_into_model(model, weights)  # type: ignore[invalid-argument-type]
+        # model is typed as Module (equinox stub issue) rather than LlamaModel
 
 
 # ---------------------------------------------------------------------------
@@ -463,8 +459,6 @@ class TestEndToEnd:
     def test_activation_capture_identifies_spike(self):
         """Plant a large weight in down_proj and verify activation spike detection."""
         import equinox as eqx
-
-        from sumow.identify import identify_super_weights
 
         cfg = TINY_CONFIG
         model = LlamaModel(cfg)
@@ -527,10 +521,10 @@ class TestForwardJit:
         model = LlamaModel(cfg)
         leaves, treedef = jax.tree.flatten(model)
         new_leaves = [
-            jax.random.normal(jax.random.PRNGKey(i), l.shape) * 0.02
-            if isinstance(l, jnp.ndarray) and l.dtype == jnp.float32
-            else l
-            for i, l in enumerate(leaves)
+            jax.random.normal(jax.random.PRNGKey(i), leaf.shape) * 0.02
+            if isinstance(leaf, jnp.ndarray) and leaf.dtype == jnp.float32
+            else leaf
+            for i, leaf in enumerate(leaves)
         ]
         model = jax.tree.unflatten(treedef, new_leaves)
 

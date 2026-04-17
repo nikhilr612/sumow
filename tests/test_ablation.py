@@ -13,20 +13,15 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from sumow.eval import cross_entropy_loss, perplexity, perplexity_from_loss
+from sumow.eval import perplexity
 from sumow.identify import (
-    LayerActivationStats,
-    SuperWeight,
     identify_super_weights,
 )
 from sumow.model import (
     LlamaModel,
     TransformerConfig,
-    load_weights_into_model,
-    make_hf_weights_dict,
 )
 from sumow.quantize import (
-    QuantizeResult,
     quantize_dequantize_blockwise,
     quantize_weight_sw_aware,
 )
@@ -216,7 +211,7 @@ class TestClippingMethodAblation:
 
     def test_zscore_vs_no_clipping(self, model, tokens):
         """Z-score clipping should reduce quantization error for well-behaved weights."""
-        ppl_orig = _eval_ppl(model, tokens)
+        _eval_ppl(model, tokens)  # baseline (unused; test focuses on relative improvement)
 
         model_none = _quantize_model(
             model, sw_map={}, clip_method="none", clip_threshold=0.0
@@ -289,7 +284,7 @@ class TestNFvsINTAblation:
 
     def test_nf4_vs_int4_ppl(self, model, tokens):
         """Compare perplexity impact of NF4 vs INT4."""
-        ppl_orig = _eval_ppl(model, tokens)
+        _eval_ppl(model, tokens)  # baseline (unused; test focuses on relative comparison)
 
         model_int = _quantize_model(model, sw_map={}, use_normal_float=False)
         model_nf = _quantize_model(model, sw_map={}, use_normal_float=True)
@@ -505,7 +500,10 @@ class TestEndToEndAblation:
 
         results = []
         for name, quant_kwargs, sw_map in configs:
-            model_q = _quantize_model(model, sw_map=sw_map, **quant_kwargs)
+            model_q = _quantize_model(model, sw_map=sw_map, **quant_kwargs)  # type: ignore[invalid-argument-type]
+            # ty can't narrow dict[str, int | bool] key→value associations when
+            # unpacking with **, so it flags all mismatching param types even
+            # though the runtime values are correct for each parameter.
             ppl_q = _eval_ppl(model_q, tokens)
             delta = abs(ppl_q - ppl_orig)
             results.append((name, ppl_q, delta))

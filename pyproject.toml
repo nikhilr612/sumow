@@ -31,3 +31,21 @@ testpaths = ["tests"]
 dev = [
     "torch>=2.11.0",
 ]
+
+[tool.ruff.lint]
+# F722: jaxtyping uses a DSL in string annotations (e.g. Float[Array, "seq dim"],
+#   Float[Array, "*dims"]) that intentionally does not conform to Python expression syntax.
+#   This fires on every shape-annotated function throughout the codebase.
+#   Suppressing globally is correct — there are no real forward-annotation syntax errors.
+# F821: Same root cause — shape variables like `seq`, `dim`, `num_poles` appear in
+#   jaxtyping shape strings as identifiers but are not Python names in scope.
+#   Every F821 in this codebase comes from jaxtyping annotations, not real undef refs.
+ignore = ["F722", "F821"]
+
+[tool.ty.rules]
+# call-non-callable: equinox.Module.__new__ is annotated to return `Module` rather than
+#   `Self`, so ty infers all Module subclass constructor calls (LlamaModel(cfg), etc.) as
+#   returning the base `Module` type. Instances are then flagged as "not callable" even
+#   though each concrete subclass defines __call__. This is an equinox stub imprecision
+#   and a pure false positive throughout this codebase.
+call-non-callable = "ignore"

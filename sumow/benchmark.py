@@ -7,16 +7,15 @@ Generates tables matching the format of Table 1 in arXiv 2411.07191:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable
 
 import equinox as eqx
 import jax.numpy as jnp
 from beartype import beartype
-from jaxtyping import Array, Float, jaxtyped
+from jaxtyping import jaxtyped
 
-from sumow.eval import cross_entropy_loss, perplexity, perplexity_from_loss
-from sumow.identify import SuperWeight, identify_super_weights
-from sumow.model import LlamaModel, TransformerConfig, make_hf_weights_dict
+from sumow.eval import perplexity
+from sumow.identify import identify_super_weights
+from sumow.model import LlamaModel, TransformerConfig
 from sumow.quantize import quantize_weight_sw_aware
 
 

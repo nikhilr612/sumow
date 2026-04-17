@@ -15,15 +15,9 @@ These tests verify the pipeline connects correctly, not numerical precision
 import jax
 import jax.numpy as jnp
 import numpy as np
-import pytest
 
-from sumow.config import QuantizationConfig
 from sumow.eval import cross_entropy_loss, perplexity, perplexity_from_loss
 from sumow.identify import (
-    LayerActivationStats,
-    SuperWeight,
-    compute_layer_stats,
-    detect_spikes,
     identify_super_weights,
 )
 from sumow.model import (

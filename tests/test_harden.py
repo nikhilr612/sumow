@@ -10,21 +10,14 @@ Covers:
 import jax
 import jax.numpy as jnp
 import numpy as np
-import pytest
 import equinox as eqx
 
 from sumow.model import (
     LlamaAttention,
-    LlamaBlock,
-    LlamaMLP,
     LlamaModel,
     RMSNorm,
-    RotaryEmbedding,
     TransformerConfig,
-    apply_rotary_pos_emb,
-    load_weights_into_model,
     make_hf_weights_dict,
-    repeat_kv,
 )
 from sumow.quantize import (
     quantize_dequantize_blockwise,
@@ -38,7 +31,7 @@ from sumow.identify import (
     detect_spikes,
     identify_super_weights,
 )
-from sumow.eval import cross_entropy_loss, perplexity
+from sumow.eval import perplexity
 
 TINY = TransformerConfig(
     vocab_size=32, hidden_size=16, intermediate_size=32,
@@ -131,14 +124,12 @@ class TestModelEdgeCases:
         # Initialize with random weights
         leaves, treedef = jax.tree.flatten(attn)
         new_leaves = [
-            jax.random.normal(jax.random.PRNGKey(i), l.shape) * 0.1
-            if isinstance(l, jnp.ndarray) and l.dtype == jnp.float32
-            else l
-            for i, l in enumerate(leaves)
+            jax.random.normal(jax.random.PRNGKey(i), leaf.shape) * 0.1
+            if isinstance(leaf, jnp.ndarray) and leaf.dtype == jnp.float32
+            else leaf
+            for i, leaf in enumerate(leaves)
         ]
         attn = jax.tree.unflatten(treedef, new_leaves)
-
-        # Full sequence
         x = jax.random.normal(jax.random.PRNGKey(99), (8, 8)) * 0.1
         y_full = attn(x)
 
@@ -348,10 +339,10 @@ class TestCrossModuleIntegration:
         # Initialize with random weights
         leaves, treedef = jax.tree.flatten(model)
         new_leaves = [
-            jax.random.normal(jax.random.PRNGKey(i), l.shape) * 0.1
-            if isinstance(l, jnp.ndarray) and l.dtype == jnp.float32
-            else l
-            for i, l in enumerate(leaves)
+            jax.random.normal(jax.random.PRNGKey(i), leaf.shape) * 0.1
+            if isinstance(leaf, jnp.ndarray) and leaf.dtype == jnp.float32
+            else leaf
+            for i, leaf in enumerate(leaves)
         ]
         model = jax.tree.unflatten(treedef, new_leaves)
 
@@ -403,10 +394,10 @@ class TestCrossModuleIntegration:
         model = LlamaModel(TINY)
         leaves, treedef = jax.tree.flatten(model)
         new_leaves = [
-            jax.random.normal(jax.random.PRNGKey(i + 50), l.shape) * 0.05
-            if isinstance(l, jnp.ndarray) and l.dtype == jnp.float32
-            else l
-            for i, l in enumerate(leaves)
+            jax.random.normal(jax.random.PRNGKey(i + 50), leaf.shape) * 0.05
+            if isinstance(leaf, jnp.ndarray) and leaf.dtype == jnp.float32
+            else leaf
+            for i, leaf in enumerate(leaves)
         ]
         model = jax.tree.unflatten(treedef, new_leaves)
 

@@ -14,7 +14,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -50,8 +49,8 @@ def _load_model():
 
     model = LlamaModel(config)
     weights = load_model_weights(str(WEIGHTS_DIR))
-    model = load_weights_into_model(model, weights)
-    return model, config
+    model = load_weights_into_model(model, weights)  # type: ignore[invalid-argument-type]
+    # model is typed as Module (equinox stub issue) rather than LlamaModel
 
 
 @pytest.fixture(scope="module")
@@ -243,7 +242,7 @@ class TestQuantizationPipeline:
             quantize_dequantize_blockwise,
             quantize_weight_sw_aware,
         )
-        from sumow.identify import SuperWeight, identify_super_weights
+        from sumow.identify import identify_super_weights
 
         model, _ = real_model
 
@@ -324,7 +323,8 @@ class TestModelRoundtrip:
         weights = make_hf_weights_dict(model)
 
         model2 = LlamaModel(config)
-        model2 = load_weights_into_model(model2, weights)
+        model2 = load_weights_into_model(model2, weights)  # type: ignore[invalid-argument-type]
+        # model2 is typed as Module (equinox stub issue) rather than LlamaModel
 
         tokens = jnp.arange(1, 9)
         logits1, _ = model(tokens)

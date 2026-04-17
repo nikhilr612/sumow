@@ -22,14 +22,15 @@ import torch
 _REF_ROOT = Path(__file__).resolve().parent.parent / "llmsuperweight" / "outliers"
 sys.path.insert(0, str(_REF_ROOT))
 
-from functional.quantization import (
+from functional.quantization import (  # noqa: E402  # sys.path must be modified before importing the llmsuperweight submodule reference implementation
+    # type: ignore[import-unresolved]  # path is added dynamically above; ty can't resolve it statically
     pack_4bit_to_int8 as ref_pack_4bit_to_int8,
     quantize_blockwise as ref_quantize_blockwise,
     round_to_nearest_pole as ref_round_to_nearest_pole,
     unpack_int8_to_4bit as ref_unpack_int8_to_4bit,
 )
 
-from sumow.quantize import (
+from sumow.quantize import (  # noqa: E402  # comes after sys.path.insert; grouped with other post-path imports for readability
     NF3_LEVELS,
     NF4_LEVELS,
     pack_4bit_to_int8 as jax_pack_4bit_to_int8,
@@ -153,7 +154,6 @@ class TestPackUnpack:
         jax_rt = np.array(jax_unpack_int8_to_4bit(jax_packed))
 
         # Both should recover the original (for even cols)
-        effective_cols = cols if cols % 2 == 0 else cols + 1
         np.testing.assert_array_equal(ref_rt[:, :cols], jax_rt[:, :cols])
 
 

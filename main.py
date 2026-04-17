@@ -9,7 +9,6 @@ Built with Typer + OmegaConf. Subcommands:
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from typing import Annotated, Optional
 
@@ -29,7 +28,7 @@ def _load_yaml_overrides(config_path: Path | None) -> dict:
     if config_path is None:
         return {}
     cfg = OmegaConf.load(config_path)
-    return OmegaConf.to_container(cfg, resolve=True)  # type: ignore[return-value]
+    return OmegaConf.to_container(cfg, resolve=True)  # type: ignore[invalid-return-type]
 
 
 def _merge_config(yaml_overrides: dict, **cli_kwargs) -> dict:
@@ -37,7 +36,7 @@ def _merge_config(yaml_overrides: dict, **cli_kwargs) -> dict:
     base = OmegaConf.create(yaml_overrides)
     cli = OmegaConf.create({k: v for k, v in cli_kwargs.items() if v is not None})
     merged = OmegaConf.merge(base, cli)
-    return OmegaConf.to_container(merged, resolve=True)  # type: ignore[return-value]
+    return OmegaConf.to_container(merged, resolve=True)  # type: ignore[invalid-return-type]
 
 
 @app.command()
@@ -62,13 +61,6 @@ def identify(
     """Identify super weights in a model (table lookup or detection)."""
     from sumow.config import SUPER_WEIGHT_DIRECTORY
 
-    yaml = _load_yaml_overrides(config)
-    params = _merge_config(
-        yaml.get("identify", {}),
-        spike_threshold=spike_threshold,
-        spike_ratio=spike_ratio,
-    )
-
     if not detect:
         coords = SUPER_WEIGHT_DIRECTORY.get(model)
         if coords is None:
@@ -92,10 +84,7 @@ def identify(
         typer.echo("--weights-dir is required when using --detect")
         raise typer.Exit(1)
 
-    import jax.numpy as jnp
-
-    from sumow.identify import identify_super_weights
-    from sumow.model_io import extract_down_proj_weights, load_model_weights
+    from sumow.model_io import load_model_weights
 
     typer.echo(f"Loading weights from {weights_dir} ...")
     weights = load_model_weights(str(weights_dir))
@@ -132,7 +121,7 @@ def quantize(
     """Apply SW-aware quantization to model weights."""
     import jax.numpy as jnp
 
-    from sumow.config import SUPER_WEIGHT_DIRECTORY, ModelConfig
+    from sumow.config import SUPER_WEIGHT_DIRECTORY
     from sumow.model_io import extract_down_proj_weights, load_model_weights
     from sumow.quantize import quantize_weight_sw_aware
 
@@ -237,7 +226,6 @@ def benchmark(
     import jax.numpy as jnp
 
     from sumow.benchmark import QuantConfig, run_benchmark as _run_bench
-    from sumow.identify import identify_super_weights
     from sumow.model import LlamaModel, TransformerConfig
 
     yaml = _load_yaml_overrides(config)

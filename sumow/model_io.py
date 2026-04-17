@@ -8,7 +8,6 @@ weight matrices and super weight values.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 import jax.numpy as jnp
 from beartype import beartype
