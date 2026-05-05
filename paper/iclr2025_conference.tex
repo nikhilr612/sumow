@@ -1,0 +1,639 @@
+
+\documentclass{article} % For LaTeX2e
+\usepackage{iclr2025_conference,times}
+
+% Optional math commands from https://github.com/goodfeli/dlbook_notation.
+\input{math_commands.tex}
+
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{subcaption}
+% \usepackage[table]{xcolor}
+\PassOptionsToPackage{table}{xcolor}
+\usepackage{xcolor}
+
+\setlength {\marginparwidth }{2cm}
+\usepackage[colorinlistoftodos]{todonotes}
+
+% custom packages and commands
+\newcommand{\tinytt}[1]{\texttt{\tiny #1}}
+\usepackage[font=small,labelfont=bf]{caption}
+% \usepackage{amssymb}% http://ctan.org/pkg/amssymb
+% \usepackage{pifont}% http://ctan.org/pkg/pifont
+% \newcommand{\cmark}{\ding{51}}%
+% \newcommand{\xmark}{\ding{55}}%
+\usepackage{multirow}
+
+\title{The Super Weight in Large Language Models}
+
+% Authors must not appear in the submitted version. They should be hidden
+% as long as the \iclrfinalcopy macro remains commented out below.
+% Non-anonymous submissions will be rejected without review.
+\iclrfinalcopy
+
+\author{Mengxia Yu$^{1}$\thanks{Work done while interning at Apple.} , De Wang$^{2}$, Qi Shan$^{2}$, Colorado J Reed$^{2}$\thanks{ Corresponding author. \texttt{cj\_reed@apple.com}} , Alvin Wan$^{2} $\\
+$^{1}$University of Notre Dame \quad 
+$^{2}$Apple \quad
+}
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to \LaTeX{} to determine where to break
+% the lines. Using \AND forces a linebreak at that point. So, if \LaTeX{}
+% puts 3 of 4 authors names on the first line, and the last on the second
+% line, try using \AND instead of \And before the third author name.
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+% \iclrfinalcopy % Uncomment for camera-ready version, but NOT for submission.
+\begin{document}
+
+
+\maketitle
+
+\begin{abstract}
+
+Recent works have shown a surprising result: a small fraction of Large Language Model (LLM) parameter outliers are disproportionately important to the quality of the model. 
+LLMs contain billions of parameters, so these small fractions, such as 0.01\%, translate into hundreds of thousands of parameters. In this work, we present an even more surprising finding: Pruning as few as \textbf{a single parameter} can destroy an LLM's ability to generate text -- increasing perplexity by 3 orders of magnitude and reducing zero-shot accuracy to guessing. 
+We propose a data-free method for identifying such parameters, termed \emph{super weights}, using a single forward pass through the model.
+We additionally find that these super weights induce correspondingly rare and large activation outliers, termed \emph{super activations}. When preserved with high precision, super activations can improve simple round-to-nearest quantization to become competitive with state-of-the-art methods. For weight quantization, we similarly find that by preserving the super weight while clipping other weight outliers, round-to-nearest quantization can scale to much larger block sizes than previously considered.
+To facilitate further research into super weights, we provide an index of super weight coordinates for common, openly available LLMs. 
+% \footnote{Code is available in \url{https://github.com/mengxiayu/LLMSuperWeight}.}
+
+
+\end{abstract}
+
+\section{Introduction}
+
+
+Large Language Models (LLMs) have been growing in size and capability at an unprecedented rate, enabling them to capture increasingly complex linguistic patterns across a wide range of tasks. However, with this increase in model scale, new and unexpected behaviors have emerged. 
+\citet{NEURIPS2022_c3ba4962} discovered that once LLMs reach a certain scale, a small set of hidden state features contains outliers of exceptionally large magnitude. These outliers account for a small percentage of all activations but are crucial for preserving the compressed model's quality \citep{NEURIPS2022_c3ba4962, 10.5555/3618408.3619993, wei-etal-2023-outlier, shao2024omniquant}. 
+
+
+However, not all outliers are equally important. 
+In this paper, we study a tiny yet important set of outliers in LLMs, termed \emph{super weights}. In Llama-7B, pruning the super weight, a single scalar, completely destroys the model's ability to generate text; the average accuracy of zero-shot downstream tasks effectively plummets to zero. Conversely, pruning the other top 7,000 outliers, including outliers that are larger than the super weight, affects no more than a few percentage points.
+
+Intriguingly, super weights behave similarly across model families and sizes. For one, the super weight is always found in the \textbf{\texttt{mlp.down\_proj}} weight, always in an early layer. We also find that the super weight amplifies input activation inliers to ultimately produce the exceptionally large magnitude activation observed by \citet{sun2024massive} -- we term this the \textit{super activation}. This super activation persists throughout the model at exactly the same magnitude and position regardless of the prompt, and we find this is uniquely enabled by skip connections. Finally, super weights suppress stopword likelihood. Taken together, pruning the super weight destroys quality by dampening the super activation and shifting almost all logit probability mass to stopwords.
+
+Both super weights and super activations, which we collectively refer to as \textit{super outliers}, are critical to model quality. Fortunately, there are no more than a handful of scalar super outliers per tensor; in light of this, we revisit round-to-nearest quantization, equipped only with the ability to hold out and restore super outliers. This yields a data-free, hardware-friendly method. For activation quantization, we find this technique competitive with SmoothQuant; for weight quantization, we can scale round-to-nearest to much larger block sizes with higher quality.
+
+Our contributions are summarized as follows.
+\begin{enumerate}
+    \item \textbf{Super Weights}: We discover a tiny subset of outliers in LLMs, at most six scalars, that are disproportionately important; pruning these super weights destroys model quality.
+    \item \textbf{Identifying Super Weights}: We present a data-free way to identify super weights using only a single forward pass and provide an index of super weights for existing, open LLMs.
+    \item \textbf{Super Activations}: We analyze how super weights influence inference and relate them to the activation outliers observed in prior work. 
+    \item \textbf{Compression}: By preserving super outliers, we show that round-to-nearest quantization increases effectiveness noticeably; preserving super outliers improves compression quality.
+\end{enumerate}
+
+
+\begin{figure}[t]
+    \includegraphics[width=\textwidth]{figs/superweight.pdf}
+    \caption{\textbf{Super Weight Phenomenon.} We discover that pruning a single, special scalar, which we call the \textit{super weight}, can completely destroy a Large Language Model's ability to generate text. On the left, the original Llama-7B, which contains a super weight, produces a reasonable completion. On the right, after pruning the super weight, Llama-7B generates complete gibberish. As we show below, this qualitative observation has quantitative impact too: zero-shot accuracy drops to guessing and perplexity increases by orders of magnitude.}
+    \label{fig:superweightintro}
+\end{figure}
+
+\section{Related Work}
+
+
+\subsection{Outliers in LLMs}
+
+LLM outliers are widely observed in existing literature. 
+\citet{kovaleva2021bert} notes weight outliers, which emerge gradually, beginning early in pre-training, and cause abnormal spikes at select dimensions in the output embedding vectors. Disabling those outliers significantly degrades both the training loss and the downstream task performance.
+\citet{bondarenko-etal-2021-understanding} notes activation outliers, which encourage specific attention patterns, such as attending to the special separator token.
+However, \cite{sun2024massive} first observes an exceptionally extraordinary outlier; in particular, they discover massive activations in LLMs that persist across layers in a fixed position, which \cite{yang2024mitigating} hypothesizes is caused by gated linear units (GLU) and its variants, such as GEGLU and SwiGLU. To mitigate these massive activations, \citet{sun2024massive} proposes a learnable attention bias, and \citep{son2024prefixing, yang2024mitigating} inserts certain prefixes.
+To complement these mitigation studies, our focus is instead to leverage, rather than mitigate, these super activations.
+
+\subsection{Outlier-aware quantization methods}
+
+Quantization is one of the most popular techniques for reducing LLM resource consumption. However, quantizing LLMs is non-trivial, due to outliers that increase the range of values. Existing works typically study two settings for LLM quantization: (1) Weight-only quantization, where only weights are quantized into low-bit integers; (2) Weight-activation quantization, where both activation and weights are quantized. 
+
+For weight-only quantization, several common solutions including using smaller block sizes, to limit the number of values any single outlier can impact \citep{dettmers2024spqr, shao2024omniquant, dettmers2023case, frantar-gptq, dettmers2023qlora}; scaling sensitive weights, via a grid-searched channel-wise scaling, \citet{lin2024awq}; or clipping outliers via learned optimal thresholds \citep{shao2024omniquant, lin2024awq}. The most common approach is to extract and store sensitive weight outliers in higher-precision \citep{dettmers2024spqr, kim2024squeezellm, NEURIPS2022_c3ba4962}. However, decomposed, mixed-precision arithmetic for hundreds of thousands of weights is unfriendly for hardware and incurs significant latency penalties. We take a different approach, handling at most a half dozen scalars to maintain hardware friendliness.
+
+For activation quantization, there are an increased number of even more aggressive outlier values, making activation quantization more challenging. To tackle this, previous work rotates \citep{liu2024spinquant,ashkboos2024quarot,QuIP},
+clips \citep{NEURIPS2022_6f6db140} or shifts \citep{wei-etal-2023-outlier, shao2024omniquant} activations to mitigate activation outliers. One effective approach scales activations \citep{10.5555/3618408.3619993}, migrating the difficulty of quantization from activations to weights with a mathematically equivalent transformation. However, this method -- SmoothQuant -- requires calibration data to find the optimal hyperparameters. We show a competitive alternative that is alternatively data-free, with a small change to a naive round-to-nearest method.
+
+Recent studies have discovered that activation outliers are associated with weight outliers. The hidden dimensions where activation outliers emerge have a high correlation to sensitive weight channels \citep{heo2024rethinking, OWQ}. Along these lines, activation magnitudes have been used as an indicator to find salient weight channels to preserve in weight quantization \citep{lin2024awq}. We find the relationship between activations and weights is even more striking: Rather than channel-wise pairs, we find relationships between two individual scalars -- up to six weights and one activation.
+
+\section{Super Weights}
+\label{sec:superweights}
+
+
+Many studies corroborate the importance of weight outliers, showing that a small percentage of the largest magnitude outliers are essential to model quality. This percentage can be as small as 0.01\%, but for these billion-parameter models, 0.01\% can still include hundreds of thousands of weights. Our investigation reveals a surprising fact about even this group of weight outliers: There exists a single, scalar weight that, despite not being the largest, holds more importance than thousands of other outlier weights combined. We call this single scalar weight a \textit{super weight}.
+
+In our analysis, we find that the super weight is \textit{necessary} for quality, having an outsized influence on quality if removed. Without the super weight, LLMs fail to generate text, resulting in qualitatively (Figure \ref{fig:superweightintro}) and quantitatively (Table~\ref{tab:importance_super_weight}) gibberish responses. In particular, zero-shot dataset accuracy is reduced to guessing, and perplexity increases by several orders of magnitude (\textit{Prune SW}). To quantify this influence, we prune all \textit{other} outlier weights (\textit{Prune Non-SW}), comparing the impact of a single super weight against 7,000 other outliers. Remarkably, the accuracy drop associated with pruning this single weight is much greater than the effect of all other outliers \emph{combined}.
+
+
+
+\begin{table}[t]
+\small
+\centering
+\begin{tabular}{@{}l|ccccccc|c|cc@{}}
+\toprule
+\textbf{Llama-7B} & \textbf{Arc-c} & \textbf{Arc-e} & \textbf{Hella.} & \textbf{Lamb.} & \textbf{PIQA} & \textbf{SciQ} & \textbf{Wino.} & \textbf{AVG} & \textbf{C4} & \textbf{Wiki-2} \\
+\midrule
+{\scriptsize Original}    & 41.81  & 75.29  & 56.93    & 73.51   & 78.67 & 94.60 & 70.01 & 70.11 & 7.08 & 5.67   \\
+{\scriptsize Prune SW}       & 19.80  & 39.60  & 30.68    & 0.52    & 59.90 & 39.40 & 56.12 & 35.14 & 763.65 & 1211.11 \\
+
+{\scriptsize Prune Non-SW} & 41.47  & 74.83  & 56.35    & 69.88   & 78.51 & 94.40 & 69.14 & 69.22 & 7.57 & 6.08   \\
+\midrule
+{\scriptsize Prune SW, +SA}    & 26.60  & 54.63  & 56.93    & 12.79   & 67.95 & 61.70 & 70.01 & 50.09 & 476.23 & 720.57 \\
+\bottomrule
+\end{tabular}
+
+
+\caption{\textbf{Super Weight Importance}. (Section \ref{sec:superweights}) \textit{Prune SW:} Pruning the single, scalar-valued super weight significantly impairs quality -- reducing accuracy on zero-shot datasets and increasing perplexity by orders of magnitude. \textit{Prune Non-SW} By contrast, retaining the super weight and instead pruning the other 7,000 largest-magnitude weights marginally affects quality. In other words, a single super weight is more important than even the top 7,000 largest weights \textit{combined}. (Section \ref{sec:mechanisms}) \textit{Prune SW, +SA:} Pruning the super weight but restoring the super activation partially recovers quality. Note that quality is still drastically impaired however, so we conclude that super activations only partially explain how super weights operate. This also shows that super weights and super activations \textit{both} need special handling, to preserve quality.}
+\label{tab:importance_super_weight}
+
+
+\end{table}
+
+
+
+\subsection{Identification of Super Weights} 
+\label{sec:sw_identification}
+
+\paragraph{Super weights create super activations.}
+
+\citet{sun2024massive} first discover a handful of exceptionally massive activations, which are crucial to model quality. Massive activations persist across many layers, feature constant magnitude, and always exist at the same position, regardless of input.
+We find a further intriguing property: The activation's channel aligns with our super weight's, and the activation first appears right after our super weight. To confirm whether this is correlation or causation, we prune the super weight and check the massive activation's magnitude. Per Figure~\ref{fig:super_activations}, we discover that pruning the super weight drastically reduces the massive activation's magnitude. This suggests that the massive activations are created by super weights. For consistency, we dub these massive activations ``\emph{super activations}''.
+
+With further investigation, we reveal the mechanism of super weights and super activations. \citet{sun2024massive} explained super activations as bias terms, but they did not explain how super activations are created and why they are always in the same positions. Through empirical analysis, we find that before down projection, the Hadamard product of the \texttt{gate} and \texttt{up} projection creates a relatively large activation, which aligns with the findings of \citet{yang2024mitigating}. More importantly, the super weights further amplify it and create super activations. 
+
+\paragraph{Identifying super weight by activation spikes.} Based on the above analysis, we present an efficient way to locate super weights: SWs can be located by detecting the spikes in the \texttt{down\_proj} inputs and outputs distributions across the layers. This detection only requires a single input prompt, rather than a set of validation data or use-case examples.
+
+Suppose that we have a \texttt{down\_proj} weight matrix \( \mathbf{W} \in \mathbb{R}^{D \times H} \), where \( D \) is the dimension of the activation feature and \( H \) is the intermediate hidden dimension. Let \( \mathbf{X} \in \mathbb{R}^{L \times H} \) be the input matrix, where \( L \) is the sequence length.
+ \( \mathbf{Y} = \mathbf{X}\mathbf{W}^T \), where \( \mathbf{Y}_{ij} = \sum_{k=1}^{d} \mathbf{X}_{ik} \mathbf{W}_{jk} \). Suppose $\mathbf{Y}_{ij}$ is a super activation. If \( \mathbf{X}_{ik}\) and \(\mathbf{W}_{jk} \) are both outliers that are much larger than other values, $\mathbf{Y}{ij}$ will be dominated by their product. That is, $\mathbf{Y}_{ij}$ $\approx$ $\mathbf{X}_{ik}$ $\mathbf{W}_{jk}$. In this case, $j$ and $k$ are determined by $\mathbf{X}_{ik}$ and $\mathbf{Y}_{ij}$. Therefore, we start by plotting extreme outliers in the input and output activations of \texttt{mlp.down\_proj}.  Then, we determine the layer and coordinates of the super weight, as illustrated in Figure~ \ref{fig:output_down_proj}. Once we have detected one super weight, we remove it from the model and repeat the above process, until the magnitudes of large maximum activations are greatly suppressed.
+
+We have identified super weights for commonly available LLMs across different LLM families and model sizes, presented in Table~\ref{tab:identified_sw_in_llms}. Most of the models we have examined have no more than three super weights. 
+The model with the most super weights, i.e., Phi-3-mini-4k-instruct, contains six. 
+We have also examined the instruction-finetuned models, such as Mistral-7B-Instruct-v0.1 and Llama-2-7B-chat. We find that their super weights are located at the same coordinates as the pre-trained models, which suggests that instruct fine-tuning does not change the position of super weights.
+
+\begin{table}
+    \scriptsize
+    \begin{minipage}{0.47\textwidth} % Add [t] for top alignment
+        \centering
+        \begin{tabular}{l|c|c|c|c}
+        \toprule
+            \textbf{Model} & \textbf{No.} & \textbf{Type} & \textbf{Weight} & \textbf{Coordinates} \\
+            \midrule
+            \multirow{1}{*}{Llama 7B} & 2  & mlp & down\_proj & [3968, 7003]          \\
+            \midrule
+            \multirow{2}{*}{Llama 13B} & 2  & mlp & down\_proj & [2231, 2278]          \\
+            & 2  & mlp & down\_proj & [2231, 6939]          \\
+            \midrule
+            \multirow{3}{*}{Llama 30B} & 3  & mlp & down\_proj & [5633, 12817]         \\
+            & 3  & mlp & down\_proj & [5633, 17439]         \\
+            & 10 & mlp & down\_proj & [5633, 14386]         \\
+            \midrule
+            \multirow{1}{*}{Llama2 7B} & 1  & mlp & down\_proj & [2533, 7890]          \\
+            \midrule
+            \multirow{1}{*}{Llama2 13B} & 3  & mlp & down\_proj & [4743, 7678]          \\
+            \midrule
+            \multirow{2}{*}{\shortstack[l]{Mistral-7B \\ {\tiny v0.1}}} & \multirow{2}{*}{1} & \multirow{2}{*}{mlp} & \multirow{2}{*}{down\_proj} & \multirow{2}{*}{[2070, 7310]} \\
+            & & & & \\
+        \bottomrule
+        \end{tabular}
+    \end{minipage}%
+    \hspace{0.04\textwidth}
+    \begin{minipage}{0.47\textwidth} % Add [t] for top alignment
+        \centering
+        \begin{tabular}{l|c|c|c|c}
+        \toprule
+            \textbf{Model} & \textbf{No.} & \textbf{Type} & \textbf{Weight} & \textbf{Coordinates} \\
+            \midrule
+            \multirow{2}{*}{\shortstack[l]{OLMo-1B \\ {\tiny 0724-hf}}} & 1  & mlp & down\_proj & [1764, 1710]          \\
+            & 1  & mlp & down\_proj & [1764, 8041]          \\
+            \midrule
+            \multirow{4}{*}{\shortstack[l]{OLMo-7B \\ {\tiny 0724-hf}}} & 1  & mlp & down\_proj & [269, 7467]           \\
+            & 2  & mlp & down\_proj & [269, 8275]           \\
+            & 7  & mlp & down\_proj & [269, 453]            \\
+            & 24 & mlp & down\_proj & [269, 2300]           \\
+            \midrule
+            \multirow{6}{*}{\shortstack[l]{Phi-3 \\ {\tiny mini-4k-instruct}}} & 2  & mlp & down\_proj & [525, 808]            \\
+            & 2  & mlp & down\_proj & [1693, 808]           \\
+            & 2  & mlp & down\_proj & [1113, 808]           \\
+            & 4  & mlp & down\_proj & [525, 2723]           \\
+            & 4  & mlp & down\_proj & [1113, 2723]          \\
+            & 4  & mlp & down\_proj & [1693, 2723]          \\
+        \bottomrule
+        \end{tabular}
+    \end{minipage}
+    \caption{\textbf{Super Weight Directory}. The above layer numbers, layer types, and weight types can be directly applied to Huggingface models. For example, for Llama-7B on Huggingface, access the super weight using \texttt{layers[2].mlp.down\_proj.weight[3968, 7003]}.}
+    \label{tab:identified_sw_in_llms}
+\end{table}
+
+\begin{figure}
+    \includegraphics[width=\textwidth]{figs/lifetime.pdf}
+    \caption{\textbf{How Super Weights behave}. \textit{I:} Super weights are often found in an early layer's down projection, indicated with a blue-purple box. The super weight immediately creates an incredibly large-magnitude super activation. \textit{II:} Super activations are propagated through skip connections, indicated with blue-purple lines. \textit{III:} This has a net effect of suppressing stopword likelihoods in the final logits. Removing the super weight causes stopword likelihood to increase, indicated with the blue-purple stacked bars. See Appendix~\ref{sec:logits}.}
+    \label{fig:lifetime}
+\end{figure}
+
+
+\begin{figure}[t]
+  \centering
+
+  
+  \begin{minipage}[t]{0.64\textwidth}
+    \begin{subfigure}[t]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{figs/in_down_proj.pdf}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{figs/out_down_proj.pdf}
+    \end{subfigure}
+      \caption{\textbf{How to identify the Super Weight} for Llama-7B. \texttt{down\_proj} input features a large maximum-magnitude activation only in Layer 2, where the super activation first appeared. The value's channel index, e.g., \texttt{7003}, tells the row of SW. \texttt{down\_proj} output likewise features a large maximum-magnitude activation at Layer 2. This value's channel index, e.g., \texttt{3968}, gives us the column of the SW.}
+    \label{fig:output_down_proj}
+  \end{minipage}
+  \hfill
+  \begin{minipage}[t]{0.32\textwidth}
+    \includegraphics[width=\linewidth]{figs/SA_magnitude_Llama7B.pdf}
+    \caption{The super activation persists throughout the entire model, at exactly the same magnitude, starting after Layer 2. Pruning the super weight decreases the super activation's magnitude by 75\%.}
+    \label{fig:super_activations}
+  \end{minipage}
+\end{figure}
+
+
+
+
+
+
+\subsection{Mechanisms of super weights}
+\label{sec:mechanisms}
+
+We find that super weights (1) induce super activations, which have lasting effects throughout the entire model, and (2) suppress stopword likelihood (Figure~\ref{fig:lifetime}).
+
+\paragraph{Super weights (partially) operate via super activations.}
+To assess whether the super weight's impact on model quality is solely mediated by the super activations or also by activations of other tokens, we conducted an experiment involving the removal of super weights (SW) and restoration of super activations (SA). Note that a super weight should influence the same channel for all tokens. 
+
+We conduct an ablation experiment under three conditions: (1) the original model, (2) remove the super weight (Prune SW), i.e., setting the weight scalar as zero, (3) remove the super weight and restore the super activation at the layer where it first appears (Prune SW,+SA). The third condition allows us to isolate the impact of super weights on super activations only.
+
+Results are shown in Table~\ref{tab:importance_super_weight}. Specifically, when we restore the super activations, the average accuracy recovers to 49.94 from 35.14, indicating that the restoration of super activations salvaged approximately 42\% of the quality loss. These findings suggest that while the super activations contribute substantially to the model's performance, they do not fully account for the super weight's overall influence on quality.
+
+\paragraph{Super weights affect output token probability distributions.}
+We studied the impact of super weights with respect to the output token probability distribution, averaged over 500 prompts from Lambaba validation set. We find that when super weights are removed, the stopword probabilities are amplified, e.g., with Llama-7B, the probability of ``the" is amplified by around 2$\times$, ``." by 5$\times$, and ``," by 10$\times$ (Figure \ref{fig:tokenprob_top10}, Appendix Figure \ref{fig:tokenprob_top50}).
+
+To dive deeper on how SW impact the output token distribution, we conduct a case study with a prompt ``Summer is hot. Winter is ". The correct next token should be ``cold", which is a word that has strong semantic meaning. With the original model with SW, it correctly predicts the next token ``cold" with a high probability 81.4\%. However, when the SW is removed, the model's top prediction is a stopword ``the" with a non-confident low probability of 9.0\%. This indicates that the SW is essential for the model to make a correct and confident prediction of meaningful words.
+
+
+
+\begin{figure}
+    \begin{subfigure}{0.32\textwidth}
+        \includegraphics[width=\textwidth]{figs/token_probs_top10_Llama-7B.pdf}
+    \end{subfigure}
+    \begin{subfigure}{0.32\textwidth}
+        \includegraphics[width=\textwidth]{figs/token_probs_top10_OLMo-7B.pdf}
+    \end{subfigure}
+    \begin{subfigure}{0.32\textwidth}
+        \includegraphics[width=\textwidth]{figs/token_probs_top10_Mistral-7B.pdf}
+    \end{subfigure}
+    \caption{\textbf{Super weights suppress stopwords.} Above, we consistently observe that removing super weights results in 2-5$\times$ larger stopword probabilities, across a variety of LLMs. At the same time, we observe non-stopwords decrease sharply in probability, reducing by 2-3$\times$ to as little as 0.1\% probability. Overall, this results in stopwords dominating the highest likelihood tokens.}
+    \label{fig:tokenprob_top10}
+\end{figure}
+
+
+\paragraph{Sensitivity of super weights.}
+
+We aim to illustrate how variations in the magnitude of super weights impact the model's quality, especially, how does increasing the magnitude affect model quality. We multiply the super weights by a scaling factor ranging from 0.0 to 3.0. Results in Figure~\ref{fig:sensitivity_SO} show that amplifying super weights can improve model accuracy, to some extent. See full versions of these plots, for more models and all datasets, in Appendix \ref{sec:sensitivity}.
+
+
+\begin{figure}[t]
+    \centering
+    \begin{subfigure}[b]{0.33\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figs/sw_scaling_Llama-7B.pdf}
+        \label{fig:sw_scaling_Llama-7B}
+    \end{subfigure}\hfill
+    \begin{subfigure}[b]{0.33\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figs/sw_scaling_Llama-13B.pdf}
+        \label{fig:sw_scaling_Llama-13B}
+    \end{subfigure}\hfill
+    \begin{subfigure}[b]{0.33\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figs/sw_scaling_Llama-30B.pdf}
+        \label{fig:sw_scaling_Llama-30B}
+    \end{subfigure}
+    \caption{\textbf{Amplifying super weight improves quality}. Across model sizes, we consistently observe that there exists \textit{some} scaling where quality is improved. Although the quality improvement is miniscule, a consistent and noticeable trend is surprising, given we're changing only one scalar out of billions. The purple line is the original model's zero-shot average accuracy.}
+    \label{fig:sensitivity_SO}
+
+\end{figure}
+
+
+\section{Super-outlier Aware Quantization}
+Quantization is a powerful technique for compressing models and reducing memory requirements. However, the presence of outliers can significantly degrade quantization quality, for both weight quantization and activation quantization. As we mentioned before, we refer to these problematic outliers, both super weights and super activations, as \textit{super outliers}. 
+As we have shown above, these super outliers carry disproportionate importance for model quality, making their preservation during quantization critical. Quantization generally maps continuous values to a finite set of values; we consider one of the simplest forms -- namely, asymmetric round-to-nearest quantization:
+\[Q(\mathbf{X}) = \text{Round}\left(\frac{\mathbf{X} - \textsc{min}(\mathbf{X})}{\Delta}\right), Q^{-1}(\mathbf{\hat{X}}) = \Delta \cdot \mathbf{\hat{X}} + \textsc{min}(\mathbf{X})
+\]
+where $\Delta = \frac{\textsc{max}(\mathbf{X}) - \textsc{min}(\mathbf{X})}{2^{N-1} - 1}$ is the quantization step and $N$ is the number of bits. Note that the maximum value is used to calculate $\Delta$, so super outliers in $X$ drastically increase the step size. With larger step sizes, inliers are rounded to more distant values on average, increasing the quantization error. With increasingly super outliers, inliers are rounded to fewer discrete values, and more quantization bins remain unused. In this way, super outliers cause poor quantization fidelity.
+
+We specifically consider the case where hardware performs arithmetic in half precision, meaning the tensor $X$ is quantized and dequantized before usage; in this setting, we can leverage prior knowledge of super outliers in two ways. First, hold out the super outlier to prevent adverse effects on inlier quantization. Second, restore the super outlier's value after dequantization, to ensure the super outlier's effects are preserved. We adopt this insight in two forms below, for weights and activations.
+
+\subsection{Activation Quantization}
+
+
+We conduct experiments using round-to-nearest quantization, with a small modification -- replace the super activation with the median value ($\textsc{Replace}$), quantize ($Q$) and dequantize ($Q^{-1}$) activations, then restore the super activation in FP16 ($\textsc{Restore}$). This can be expressed as the following,
+
+
+\begin{equation}
+    \hat{A} = \textsc{Restore}(Q^{-1}(Q(\textsc{Replace}(A)))
+\end{equation}
+
+Since the super activation is a single scalar, the bitrate and kernel complexity are not significantly impacted.
+
+
+\subsection{Weight Quantization}
+
+Prior art uses \citep{dettmers2023qlora, lin2024awq} small group sizes of 64 or 128, as \citet{dettmers2023case} finds that small group sizes are required for precise low-bit quantization. However, the small group sizes come with computational and bitrate overhead, requiring other techniques to handle a high number of half precision scales and biases.
+
+To address this challenge, we propose a simple method to improve INT4 quantization with large blocksizes. First, we identify super weights using Section \ref{sec:sw_identification}. Second, to improve inlier fit, we clip ($\textsc{Clip}$) the outlier weights; in this step, the super weight is clipped as well. Quantize ($Q$) and dequantize ($Q^{-1}$) the clipped weights. Then, to ensure the effect of the super weight is preserved, we restore the half-precision super weight after dequantization ($\textsc{Restore}$).
+
+\begin{equation}
+    \hat{W} = \textsc{Restore}(Q^{-1}(Q(\textsc{Clip}_z(W)))
+\end{equation}
+
+As described in the equation above, we parameterize clipping using a z-score. Assuming all weights fit a Gaussian, we consider all values with a z-score beyond a certain threshold $z$ to be an outlier. To tune this hyperparameter $z$, we find the minimum reconstruction error z-score using 500 examples from the Wikitext-2 train set.
+
+\section{Experiments}
+
+\begin{table}[t]
+    \centering
+    \small
+    \begin{tabular}{l ccccccc}
+        \toprule
+        \textbf{PPL ($\downarrow$)} & \multicolumn{2}{c}{Llama-7B} & \multicolumn{2}{c}{Llama-13B} & \multicolumn{2}{c}{Llama-30B} \\
+        \cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+         & Wiki-2 & C4 & Wiki-2 & C4 & Wiki-2 & C4 \\
+        \midrule
+        FP16 & 5.68 & 7.08 & 5.09 & 6.61 & 4.10 & 5.98 \\
+        \midrule
+        Naive W8A8 & 5.83 \textit{\scriptsize(0\%)\hspace{5pt}} & 7.23 \textit{\scriptsize(0\%)\hspace{5pt}} & 5.20 \textit{\scriptsize(0\%)\hspace{5pt}} & 6.71 \textit{\scriptsize(0\%)\hspace{5pt}} & 4.32 \textit{\scriptsize(0\%)\hspace{5pt}} & 6.14 \textit{\scriptsize(0\%)\hspace{5pt}} \\
+        SmoothQuant & \textbf{5.71} \textit{\scriptsize(100\%)\hspace{-1pt}} & \textbf{7.12} \textit{\scriptsize(100\%)\hspace{-1pt}} & \textbf{5.13} \textit{\scriptsize(100\%)\hspace{-1pt}} & \textbf{6.64} \textit{\scriptsize(100\%)\hspace{-1pt}} & \textbf{4.20} \textit{\scriptsize(100\%)\hspace{-1pt}} & \textbf{6.06} \textit{\scriptsize(100\%)\hspace{-1pt}} \\
+        Ours & \textbf{5.74} \textit{\scriptsize(75\%)\hspace{1pt}} & \textbf{7.14} \textit{\scriptsize(82\%)\hspace{1pt}} & \textbf{5.15} \textit{\scriptsize(71\%)\hspace{1pt}} & \textbf{6.66} \textit{\scriptsize(71\%)\hspace{1pt}} & \textbf{4.22} \textit{\scriptsize(83\%)\hspace{1pt}} & \textbf{6.08} \textit{\scriptsize(75\%)\hspace{1pt}} \\
+        \bottomrule
+    \end{tabular}
+    \caption{\textbf{Round-to-nearest with super-activation handling is competitive}. \textit{W8A8} is the baseline 8-bit weight and activation quantization, and the small italicized, parenthesized percentages denote what percentage of SmoothQuant's quality improvement is retained. We observe that a naive round-to-nearest, while handling a single scalar super activation per tensor, is competitive with SmoothQuant. Note that SmoothQuant uses calibration data to compute scales, whereas our method does not require data.}
+    \label{tab:act_quant_results_llama}
+\end{table}
+
+
+
+
+\begin{table}[t]
+    \centering
+    \small
+    \begin{tabular}{l cccccccc}
+        \toprule
+        \textbf{PPL ($\downarrow$)} & \multicolumn{2}{c}{OLMo-1B} & \multicolumn{2}{c}{OLMo-7B} &  \multicolumn{2}{c}{Mistral-7B} \\
+        \cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+         & Wiki-2 & C4 & Wiki-2 & C4  & Wiki-2 & C4 \\
+        \midrule
+        FP16 & 10.12\tiny{\,(\textit{100\%})\hspace{-1pt}} & 12.31\tiny{\,(\textit{100\%})\hspace{-1pt}} & 7.51\tiny{\,(\textit{100\%})\hspace{-1pt}} & 9.52\tiny{\,(\textit{100\%})\hspace{-1pt}}  & 5.25\tiny{\,(\textit{100\%})\hspace{-1pt}} & 7.75\tiny{\,(\textit{100\%})\hspace{-1pt}} \\
+        Naive W8A8 & 10.79\tiny{\,(\textit{0\%})\hspace{5pt}} & 12.84\tiny{\,(\textit{0\%})\hspace{5pt}} & 8.70\tiny{\,(\textit{0\%})\hspace{5pt}} & 10.41\tiny{\,(\textit{0\%})\hspace{5pt}}  & 5.32\tiny{\,(\textit{0\%})\hspace{5pt}} & 7.83\tiny{\,(\textit{0\%})\hspace{5pt}} \\
+        Ours & \textbf{10.23}\tiny{\,(\textit{84\%})\hspace{1pt}} & \textbf{12.52}\tiny{\,(\textit{60\%})\hspace{1pt}} & \textbf{7.80}\tiny{\,(\textit{76\%})\hspace{1pt}} & \textbf{9.72}\tiny{\,(\textit{78\%})\hspace{1pt}}  & \textbf{5.31}\tiny{\,(\textit{14\%})\hspace{1pt}} & \textbf{7.81}\tiny{\,(\textit{25\%})\hspace{1pt}} \\
+        \bottomrule
+    \end{tabular}
+
+    \caption{\textbf{Handling the super activation improves activation quantization}. Perplexity $\downarrow$ on Wikitext-2 and C4 for OLMo models and various quantization methods. We can see that simply restoring the scalar-valued super activation after quantizing and dequantizing successfully improves quantization's effectiveness at preserving quality. Notably, note that SmoothQuant does not work on OLMo, as its LayerNorms do not have adjustable parameters. See more results in Appendix \ref{sec:actquantours}}.
+    \label{tab:act_quant_results_others}
+\end{table}
+
+To comprehensively demonstrate the effects of super weights, we conduct experiments across LLaMA 7B to 30B, \citep{touvron2023llamaopenefficientfoundation}, Mistral 7B \citep{jiang2023mistral7b}, and OLMo \citep{groeneveld2024olmo} \footnote{For OLMo, we use their latest Huggingface checkpoints, e.g., \texttt{allenai/OLMo-7B-0724-hf}.}  To assess the practical application capabilities of LLMs, we evaluate their accuracy on zero-shot benchmarks, including PIQA \citep{bisk2020piqa}, ARC \citep{clark2018thinksolvedquestionanswering}, HellaSwag \citep{zellers-etal-2019-hellaswag}, Lambada \citep{paperno-etal-2016-lambada}, and Winogrande \citep{10.1145/3474381}.  We use the lm-evaluation-harness \citep{eval-harness} library to evaluate the above tasks. We also calculate the perplexity for Wikitext-2 \citep{merity2017pointer} and C4 \citep{c4}, following the widely accepted setting from \citep{frantar-gptq}.
+
+
+% Soften the language :) Just say our method is very simple and it obtains 75% of the benefits
+\subsection{Activation Quantization}
+Following SmoothQuant's setting, we simulate W8A8 quantization with FP16 arithmetic. Specifically, we perform 8-bit per-tensor quantization for weights, and 8-bit per-token quantization for activations. We quantize the inputs and weights for linear layers (including \texttt{q}, \texttt{k}, \texttt{v}, \texttt{gate}, \texttt{up}, \texttt{down} projections), and BMM (i.e., batched matmul) in attention layers. For SmoothQuant, we use the default  $\alpha $ as 0.85.  
+
+
+We compare our method with SmoothQuant in Table~\ref{tab:act_quant_results_llama}. For three Llama models on both datasets, we achieve over 70\% of SmoothQuant's improvement over naive quantization. On C4 with Llama-7B and on Wikitext with Llama-30B, we attain above 80\% of SmoothQuant's improvement. Our method demonstrates that a significantly simplified approach to quantization can achieve competitive results compared to more complex methods. Unlike SmoothQuant, which applies scales to every activation channel, our method focuses solely on addressing one critical activation outlier. 
+
+
+We extended our evaluation to include additional LLMs: OLMo (1B and 7B), Mistral-7B, and Llama-2-7B. Results are shown in Table~\ref{tab:act_quant_results_others} and Appendix Table \ref{tab:act_quant_ours_more}. These models represent a diverse set of architectures and training paradigms, allowing us to assess the generalizability of our quantization method. Since SmoothQuant does not report on this set of models, we compare our results with naive W8A8 quantization. Across all models and datasets, our method consistently outperforms naive W8A8 quantization.  
+Our method demonstrates remarkable performance on OLMo models. 
+
+
+Notably, OLMo models use non-parametric LayerNorm, making them incompatible with the SmoothQuant method, which relies on LayerNorm weights to apply the per-channel scales. On Mistral-7B, the improvements are smaller. We hypothesize that this is because the LayerNorm of these models may have learned weights that aggressively suppress the super activation, resulting in a more uniform distribution of activation magnitudes.
+
+These results underscore the critical importance of the super activation in maintaining model performance during quantization. By addressing this single activation with minimal computational overhead, our method captures a significant portion of the benefits achieved by more complex quantization schemes. This finding suggests that the super activation plays a disproportionately large role in preserving model quality during the quantization process.
+
+\subsection{Weight Quantization}
+
+Recent advancements in LLM quantization techniques have inadvertently highlighted the importance of super weights. Two notable methods, AWQ \citep{lin2024awq} and SqueezeLLM \citep{kim2024squeezellm}, demonstrate the significance of preserving these super weights, albeit through different approaches.
+
+\subsubsection{Existing Workarounds for the Super Weight}
+
+AWQ, recognizing the need to minimize quantization errors for important weights, introduced a per-channel scaling method. This technique automatically searches for optimal scaling factors, effectively amplifying crucial weight channels. Our analysis of Llama-7B revealed that AWQ scales up the super weight by a factor of 12, corroborating our assessment of the super weight's importance.
+Similarly, SqueezeLLM proposes a sparse matrix approach that retains the top 0.05\% of outlier values in FP16 precision. Our investigation confirmed that this sparse matrix consistently includes the super weights, further validating their importance. Both AWQ and SqueezeLLM, despite employing different strategies, converge on the same principle: protecting super weights is crucial for effective weight quantization in LLMs.
+
+
+
+\subsubsection{Scaling up Block Sizes}
+
+
+To evaluate the effectiveness of the proposed super weight-aware quantization method, we compare it with the traditional round-to-near quantization approach. We assess the models on a suite of zero-shot downstream tasks, with results illustrated in Figure \ref{fig:blocksize_scaling}.
+
+In the traditional round-to-near quantization, we observe a clear trend: as the block size increases, model quality significantly degrades. This decline likely results from the increased quantization error introduced when larger blocks of weights are quantized together, which allows outliers to impact more weights. In contrast, our super weight-aware quantization method demonstrates much greater robustness to larger block sizes. As the block size increases, the degradation in model quality is noticeably smaller compared to the round-to-near method. This robustness stems from our method's ability to preserve the most critical weight (the super weight) while minimizing the influence of outlier weights on the overall quantization process. By clipping outliers and focusing on inlier weights, our method maintains higher fidelity in representing the model's parameters.
+
+A key advantage of our method is its ability to support larger block sizes with less loss in model quality. This capability leads to a lower average bitrate and smaller file sizes, which are essential for deploying models in resource-constrained environments, such as mobile devices or edge computing scenarios.
+
+
+\begin{figure}[t]
+  \centering
+  \begin{subfigure}[b]{0.49\textwidth}
+    \includegraphics[width=\textwidth]{figs/blocksize_curve_llama7b.pdf}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.49\textwidth}
+    \includegraphics[width=\textwidth]{figs/blocksize_curve_mistral7b.pdf}
+  \end{subfigure}
+  \caption{\textbf{Restoring super weight improves block scaling}. Smaller block sizes are often used to handle outliers implicitly. We note that block sizes can scale slightly more gracefully by just handling the single scalar-valued super weight.}
+    \label{fig:blocksize_scaling}
+\end{figure}
+
+
+
+\section{Conclusion}
+
+Our study of Large Language Models has revealed the critical role of super outliers -- specifically, the super weight and its induced super activation. Although these super outliers are small in number, identifying and preserving them is essential for model quality; pruning the super weight completely destroys the model's ability to generate text, and retaining the super weight can significantly improve the quantized model's quality.
+
+Our findings shed light on how these outliers influence model behavior and provide practical strategies for their detection and management. By sharing a directory of super weights, we furthermore hope to inspire further research into their properties and implications.
+
+\bibliography{iclr2025_conference}
+\bibliographystyle{iclr2025_conference}
+
+\newpage
+\appendix
+\section{Appendix}
+
+
+
+\subsection{Super Weight Sensitivity} \label{sec:sensitivity}
+In this section, we show the full set of results on zero-shot downstream datasets. Results are shown in Table~\ref{tab:result_amplify_sw_fp16} for FP16 models. From the table, we can see that some datasets are more sensitive to super weight (SW) amplification. For example, Winogrande and Lambada show consistent improvements across models when amplifying SW, while PIQA shows same or slightly lower accuracy. We also evaluate the 4-bit quantized Llama-7B with amplified SW in Table~\ref{tab:result_amplify_sw_int4}. We observe similar minor improvements when SW is amplified. 
+
+
+
+
+\begin{table}[htb]
+\centering
+\small
+\begin{tabular}{@{}lcccccc@{}ll}
+\toprule
+ & \multicolumn{2}{c}{Llama-7B}& \multicolumn{2}{c}{Llama-13B}& \multicolumn{2}{c}{Llama-30B}& \multicolumn{2}{c}{Mistral-7B}\\ 
+ \cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-9}
+ & Original & Amplified & Original & Amplified & Original & Amplified  & Original &Amplified \\
+ \midrule
+
+ARC-C & 41.81 & 41.89 & 46.42 & 46.76 & 52.82 & 52.47  & 50.25 &49.74 \\
+ARC-E & 75.29 & 75.63 & 77.36 & 77.19 & 80.39 & 80.51  & 80.89 &81.02 \\
+Hella. & 56.93 & 56.76 & 59.96 & 59.82 & 63.34 & 63.21  & 61.23 &61.39 \\
+Lamb. & 73.51 & 74.09 & 76.15 & 76.58 & 77.59 & 77.68  & 75.62 &75.92 \\
+PIQA & 78.67 & 78.67 & 79.11 & 78.94 & 80.96 & 81.28  & 80.73 &80.47 \\
+SciQ & 94.60 & 95.40 & 95.00 & 95.30 & 96.10 & 96.10  & 95.90 &96.00 \\
+Wino. & 70.01 & 71.11 & 72.77 & 72.85 & 75.69 & 76.01  & 73.71 &74.11 \\
+\midrule
+AVG & 70.12 & 70.51 & 72.39 & 72.49 & 75.27 & 75.33  & 74.05 &74.09 \\ \bottomrule
+\end{tabular}%
+
+\caption{Accuracy of zero-shot benchmarks of amplifying super weights in FP16 models. The scaling factor is chosen by the highest average accuracy. }
+\label{tab:result_amplify_sw_fp16}
+\end{table}
+
+
+\begin{table}[htb]
+\centering
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+ & \multicolumn{2}{c}{RTN-4bit-8x8} & \multicolumn{2}{c}{RTN-4bit-64x64} \\ \cmidrule(lr){2-3}  \cmidrule(lr){4-5}
+ & Original & Amplified & Original & Amplified \\ \midrule
+Llama-7B & 69.59 & 69.88 & 66.19 & 67.54 \\
+Llama-13B & 72.09 & 72.13 & 71.86 & 72.07 \\
+Llama-30B & 74.93 & 75.16 & 73.88 & 74.04 \\ \bottomrule
+\end{tabular}%
+
+
+\caption{Average accuracy of zero-shot benchmarks of amplifying super weights in models with round-to-nearest 4bit weight quantization with blocksizes of 8x8 and 64x64. On quantized models, amplifying super weights also yields a small yet consistent quality improvement.}
+\label{tab:result_amplify_sw_int4}
+\end{table}
+
+
+
+We visualize the full sensitivity graph starting from zero. We note that the average of all zero-shot datasets is around 30\% when datasets are reduced to guessing accuracies.
+
+\begin{figure}[hb]
+    \centering
+    \begin{subfigure}[b]{0.33\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figs/sw_scaling_Llama-7B_full.pdf}
+        \label{fig:sw_scaling_Llama-7B_full}
+    \end{subfigure}\hfill
+    \begin{subfigure}[b]{0.33\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figs/sw_scaling_Llama-13B_full.pdf}
+        \label{fig:sw_scaling_Llama-13B_full}
+    \end{subfigure}\hfill
+    \begin{subfigure}[b]{0.33\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figs/sw_scaling_Llama-30B_full.pdf}
+        \label{fig:sw_scaling_Llama-30B_full}
+    \end{subfigure}
+    \caption{\textbf{Amplifying super weight improves quality}. Full results for scaling super weight from 0 to 3.}
+    \label{fig:sensitivity_SO_full}
+\end{figure}
+
+
+
+
+\subsection{Maximum-magnitude Activation of Down Projection Module}
+
+Below, we show more examples of identifying super weights. We visualize the maximum-magnitude activations in the inputs and outputs of \texttt{down\_proj} of all the transformer layers. The outlier "sparks" indicate the row and column index of super weights.
+
+\begin{figure}
+    \centering
+    \begin{subfigure}[h]{0.33\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figs/in_down_proj_mistral7b.pdf}
+    \end{subfigure}
+    \begin{subfigure}[h]{0.33\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figs/out_down_proj_mistral7b.pdf}
+    \end{subfigure}
+    \caption{Maximum-magnitude activation of \texttt{down\_proj} across all transformer layers of Mistral-7B.}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \begin{subfigure}[h]{0.33\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figs/in_down_proj_olmo7b.pdf}
+    \end{subfigure}
+    \begin{subfigure}[h]{0.33\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figs/out_down_proj_olmo7b.pdf}
+    \end{subfigure}
+    \caption{Maximum-magnitude activation of \texttt{down\_proj} across all transformer layers of OLMo-7B.}
+\end{figure}
+
+\subsection{Logit Distribution with Super Weight Removal}
+\label{sec:logits}
+
+Below, we visualize more of the logit distribution, when super weights are removed from Llama-7B. Despite the more thorough visualization, the conclusions remain the same: stopwords are amplified and non-stopwords see a drastic decrease in likelihood.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figs/token_probs_top50_Llama-7B.pdf}
+    \caption{Output token distribution before and after removing the super weight on Llama-7B.}
+    \label{fig:tokenprob_top50}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figs/token_probs_top50_Mistral-7B.pdf}
+    \caption{Output token distribution before and after removing the super weight on Mistral-7B.}
+    \label{fig:tokenprob_top50_mistral7b}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figs/token_probs_top50_OLMo-7B.pdf}
+    \caption{Output token distribution before and after removing the super weight on OLMo-7B.}
+    \label{fig:tokenprob_top50_olmo7b}
+\end{figure}
+
+
+
+\subsection{Additional Activation Quantization Results with Super Activations}
+\label{sec:actquantours}
+
+Below, we include results for Llama-2 7B using our activation quantization. See Table \ref{tab:act_quant_ours_more}.
+
+\begin{table}[hb]
+    \centering
+    \small
+    \begin{tabular}{l ccc}
+        \toprule
+        \textbf{PPL ($\downarrow$)} & \multicolumn{2}{c}{Llama-2-7B} \\
+        \cmidrule(lr){2-3}
+         & Wiki-2 & C4  \\
+        \midrule
+        FP16 & 5.47\tiny{\,(\textit{100\%})\hspace{-1pt}} & 6.97\tiny{\,(\textit{100\%})\hspace{-1pt}} \\
+        \midrule
+        W8A8 & 5.58\tiny{\,(\textit{0\%})\hspace{5pt}} & 7.09\tiny{\,(\textit{0\%})\hspace{5pt}} \\
+        \midrule
+        Ours & \textbf{5.57}\tiny{\,(\textit{9.1\%})\hspace{1pt}} & \textbf{7.07}\tiny{\,(\textit{16.7\%})\hspace{1pt}} \\
+        \bottomrule
+    \end{tabular}
+    \caption{Perplexity ($\downarrow$) on Wikitext-2 and C4 with Llama-2-7B.}
+    \label{tab:act_quant_ours_more}
+    
+\end{table}
+
+
+\subsection{Super Weights and Attention Sinks}
+Given that super activations are typically observed on the first token of an input sequence, we hypothesized a potential relationship between super weights and the well-documented phenomenon of attention sinks \citep{xiao2024efficient, son2024prefixing}. To test this hypothesis, we conducted experiments comparing attention weight patterns in the presence and absence of super weights. Contrary to our initial expectations, we find that attention sinks persist even when super weights are removed from the model, while not preserving model quality. 
+
+\end{document}

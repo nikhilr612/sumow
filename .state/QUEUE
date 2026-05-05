@@ -1,0 +1,4 @@
+BENCH:benchmark_infrastructure
+OPTIMIZE:activation_quantization_tests
+HARDEN:serialization_and_roundtrip
+DOCS:update_readme

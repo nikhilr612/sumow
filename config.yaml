@@ -1,0 +1,19 @@
+# sumow configuration file (OmegaConf YAML)
+# Pass to any CLI command with: --config config.yaml
+
+identify:
+  spike_threshold: 100.0
+  spike_ratio: 6.0
+
+quantize:
+  nbits: 4
+  blocksize: 128
+  clip_method: zscore
+  clip_threshold: 9.0
+
+benchmark:
+  hidden_size: 64
+  num_layers: 4
+  seq_len: 48
+  blocksize: 32
+  seed: 42

@@ -1,7 +1,51 @@
 [project]
 name = "sumow"
 version = "0.1.0"
-description = "Add your description here"
+description = "JAX/Equinox implementation of super weight analysis for LLMs"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "beartype>=0.22.9",
+    "equinox>=0.13.6",
+    "jax>=0.9.2",
+    "jaxtyping>=0.3.9",
+    "omegaconf>=2.3.0",
+    "optax>=0.2.8",
+    "pydantic>=2.13.1",
+    "safetensors>=0.5.0",
+    "typer>=0.24.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.scripts]
+sumow = "main:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "torch>=2.11.0",
+]
+
+[tool.ruff.lint]
+# F722: jaxtyping uses a DSL in string annotations (e.g. Float[Array, "seq dim"],
+#   Float[Array, "*dims"]) that intentionally does not conform to Python expression syntax.
+#   This fires on every shape-annotated function throughout the codebase.
+#   Suppressing globally is correct — there are no real forward-annotation syntax errors.
+# F821: Same root cause — shape variables like `seq`, `dim`, `num_poles` appear in
+#   jaxtyping shape strings as identifiers but are not Python names in scope.
+#   Every F821 in this codebase comes from jaxtyping annotations, not real undef refs.
+ignore = ["F722", "F821"]
+
+[tool.ty.rules]
+# call-non-callable: equinox.Module.__new__ is annotated to return `Module` rather than
+#   `Self`, so ty infers all Module subclass constructor calls (LlamaModel(cfg), etc.) as
+#   returning the base `Module` type. Instances are then flagged as "not callable" even
+#   though each concrete subclass defines __call__. This is an equinox stub imprecision
+#   and a pure false positive throughout this codebase.
+call-non-callable = "ignore"
